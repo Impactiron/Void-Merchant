@@ -4,13 +4,12 @@ STATUS: Version 0.7.1 (Hive Integration & Beam Weapons)
 ## Projekt Status: Void Merchant
 
 ## Dateibaum
-
 /root
 	index.html
 		/css
 			style.css
 		/js
-		/core
+			/core
 				SectorThreatManager.js (Hive Logic)
 				config.js
 				GameLoop.js 
@@ -63,10 +62,10 @@ js/data/FactionDB.js
 - Threat System: Mining triggert Kha'ak Spawns.
 
 ## Aktueller Code-Hash
-js/core/SectorThreatManager.js
-js/components/BeamComponent.js
-js/data/WeaponDB.js
-js/scenes/GameScene.js
+- js/core/SectorThreatManager.js
+- js/components/BeamComponent.js
+- js/data/WeaponDB.js
+- js/scenes/GameScene.js
 
 ## Aktueller Code-Hash
 - js/components/HealthComponent.js
