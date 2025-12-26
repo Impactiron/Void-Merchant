@@ -62,3 +62,5 @@ export default class BeamComponent extends Phaser.GameObjects.Graphics {
         }
     }
 }
+
+

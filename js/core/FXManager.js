@@ -126,3 +126,5 @@ export default class FXManager {
         entity.setVisible(false);
     }
 }
+
+

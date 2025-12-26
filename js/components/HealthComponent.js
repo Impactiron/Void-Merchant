@@ -126,3 +126,4 @@ export default class HealthComponent {
         this.emitUpdate();
     }
 }
+
