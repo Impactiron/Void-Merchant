@@ -7,7 +7,7 @@ STATUS: Version 0.7.1 (Hive Integration & Beam Weapons)
 /root
 	index.html
 		/css
-			style.css
+			/style.css
 		/js
 			/core
 				SectorThreatManager.js (Hive Logic)
