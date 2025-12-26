@@ -1,8 +1,9 @@
 # Void-Merchant
 STATUS: Version 0.7.1 (Hive Integration & Beam Weapons)
 
-Projekt Status: Void Merchant
-Dateibaum
+# Projekt Status: Void Merchant
+# Dateibaum
+
 js/core/SectorThreatManager.js (Hive Logic)
 js/components/BeamComponent.js (Beam Visuals)
 js/data/WeaponDB.js (Kha'ak Beam Integration)
@@ -42,16 +43,19 @@ js/data/WareDB.js
 js/data/SectorDB.js
 js/data/ModuleDB.js
 js/data/FactionDB.js 
-Globale Variablen & State
+
+# Globale Variablen & State
 threatLevels: Map im SectorThreatManager.
 Event mining-complete: Triggert Bedrohungsanstieg.
-Letzte Änderung
+
+# Letzte Änderung
 Implementierung der Hive-Mind-Logik und des Beam-Waffensystems.
 ✅ Beam Weapons: Implementiert (Visuals + Instant Hit Logic).
 ✅ Ship Entity: Update für Beam-Support.
 ✅ WeaponSystem: Hybrid-Support (Projektile & Beams).
 ✅ Threat System: Mining triggert Kha'ak Spawns.
-Aktueller Code-Hash
+
+# Aktueller Code-Hash
 js/core/SectorThreatManager.js
 js/components/BeamComponent.js
 js/data/WeaponDB.js
