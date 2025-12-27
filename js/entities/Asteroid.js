@@ -1,87 +1,118 @@
-import HealthComponent from '../components/HealthComponent.js'; // KORREKTUR: Default Import (ohne {})
-// Falls Loot noch nicht existiert oder anders exportiert wird, ggf. anpassen. 
-// Ich gehe hier von einem Named Export für Entities aus, oder einem Default. 
-// Sicherheitshalber nutze ich hier dynamische Imports oder Standard-Muster.
-// Da ich Loot.js in der Liste sah, gehe ich von einem Standard-Export aus.
-import { Loot } from './Loot.js'; 
-
-export class Asteroid extends Phaser.Physics.Arcade.Sprite {
-    constructor(scene, x, y, texture = 'asteroid_base') {
-        super(scene, x, y, texture);
-
-        // Zur Szene und Physik hinzufügen
-        scene.add.existing(this);
-        scene.physics.add.existing(this);
-
-        // Physik-Eigenschaften
-        this.setImmovable(true); // Asteroiden werden nicht weggeschoben (vorerst)
-        this.body.setCircle(this.width / 2.5); // Hitbox etwas kleiner als die Grafik
-        this.setFriction(1);
+/**
+ * @class Asteroid
+ * @extends Phaser.Physics.Arcade.Sprite
+ * * Repräsentiert einen abbaubaren Asteroiden.
+ * ÄNDERUNG: Import von Loot entfernt, Delegation an Scene.
+ */
+export default class Asteroid extends Phaser.Physics.Arcade.Sprite {
+    /**
+     * @param {Phaser.Scene} scene 
+     * @param {number} x 
+     * @param {number} y 
+     * @param {string} size 'small', 'medium', 'large'
+     */
+    constructor(scene, x, y, size = 'medium') {
+        // Wir nutzen hier ein generisches Asteroiden-Sprite. 
+        // Falls Assets fehlen, nutzt Phaser oft ein Platzhalter-Rechteck, wenn der Key nicht existiert.
+        super(scene, x, y, 'spr_asteroid_iron');
         
-        // Visuelles Feedback: Zufällige Rotation
-        this.setAngularVelocity(Phaser.Math.Between(-10, 10));
-        this.setScale(Phaser.Math.FloatBetween(0.8, 1.5));
-
-        // Komponenten
-        // HP variieren je nach Größe
-        const hp = Math.floor(200 * this.scale);
-        this.health = new HealthComponent(this, hp, hp);
+        this.scene = scene;
+        this.scene.add.existing(this);
+        this.scene.physics.add.existing(this);
         
-        // Event-Binding für Zerstörung
-        this.health.onDeath = () => this.destroyEntity();
-
-        // Loot / Mining Daten
-        this.resourceType = 'ore_iron'; // Platzhalter, später aus Sektor-Daten
-        this.resourceAmount = Phaser.Math.Between(50, 500);
+        this.sizeCategory = size;
+        this.configureStats(size);
+        
+        // Physics Setup
+        // Zufällige Bewegung und Rotation für mehr Dynamik im All
+        this.body.setVelocity(Phaser.Math.Between(-20, 20), Phaser.Math.Between(-20, 20));
+        this.body.setAngularVelocity(Phaser.Math.Between(-10, 10));
+        this.body.setBounce(0.2); // Leichter Abprall
+        this.body.setDrag(10);    // Etwas Reibung im "Vakuum" (Gameplay > Realismus)
     }
 
     /**
-     * Wird aufgerufen, wenn ein Projektil trifft
-     * @param {number} damage 
+     * Konfiguriert HP, Masse und Größe basierend auf der Kategorie.
+     * @param {string} size 
      */
-    takeDamage(damage) {
-        if (this.health) {
-            // Flash-Effekt bei Treffer
-            this.setTint(0xff0000);
-            this.scene.time.delayedCall(100, () => this.clearTint());
+    configureStats(size) {
+        let targetDiameter = 64; 
+        
+        switch (size) {
+            case 'small': 
+                targetDiameter = 32; 
+                this.hp = 100; 
+                this.mass = 1000; 
+                break;
+            case 'large': 
+                targetDiameter = 128; 
+                this.hp = 800; 
+                this.mass = 10000; 
+                break;
+            default: // medium
+                targetDiameter = 64; 
+                this.hp = 300; 
+                this.mass = 5000; 
+                break;
+        }
 
-            this.health.decrease(damage);
+        // Skaliere das Sprite (angenommen das Original ist ca. 64-128px)
+        // Wir setzen hier die DisplaySize fix, um Konsistenz zu wahren.
+        this.setDisplaySize(targetDiameter, targetDiameter);
+        
+        // Hitbox anpassen (etwas kleiner als das Bild für faires Gefühl)
+        const hitboxRadius = (this.displayWidth / 2) * 0.85;
+        this.body.setCircle(hitboxRadius);
+        // Zentrieren des Offsets ist bei setCircle manchmal tricky, oft reicht der Radius wenn Origin 0.5,0.5 ist
+        
+        this.body.setMass(this.mass);
+        this.maxHp = this.hp;
+    }
+
+    /**
+     * Verarbeitet Schaden.
+     * @param {number} amount 
+     */
+    takeDamage(amount) {
+        this.hp -= amount;
+        
+        // Visuelles Feedback: Roter Blitz
+        this.setTint(0xff5555);
+        this.scene.time.delayedCall(100, () => {
+            if (this.active) this.clearTint();
+        });
+
+        if (this.hp <= 0) {
+            this.destroyAsteroid();
         }
     }
 
     /**
-     * Zerstörungs-Logik
+     * Zerstört den Asteroiden, spielt FX und droppt Loot via Scene.
      */
-    destroyEntity() {
-        if (!this.active) return;
-
-        // 1. Explosion FX
-        // Prüfen ob FXManager in der Szene existiert, sonst Fallback
+    destroyAsteroid() {
+        // 1. FX (Explosion)
         if (this.scene.fxManager) {
-            this.scene.fxManager.playExplosion(this.x, this.y, 'asteroid');
+            // Skalierung der Explosion basierend auf Asteroiden-Größe
+            let scale = (this.sizeCategory === 'large') ? 2.0 : (this.sizeCategory === 'small' ? 0.5 : 1.0);
+            this.scene.fxManager.playExplosion(this.x, this.y, scale);
         }
 
-        // 2. Loot Drop (Chance 100% bei Asteroiden für Mining)
-        this.spawnLoot();
+        // 2. LOOT DROP DELEGATION
+        // Wir prüfen sicherheitshalber, ob die Scene die Methode hat
+        if (typeof this.scene.spawnLoot === 'function') {
+            let amount = (this.sizeCategory === 'large') ? Phaser.Math.Between(5, 10) : Phaser.Math.Between(2, 5);
+            if (this.sizeCategory === 'small') amount = 1;
 
-        // 3. Event für das Spielsystem (z.B. für Kha'ak Spawn Logik)
-        this.scene.events.emit('asteroid-destroyed', { x: this.x, y: this.y, amount: this.resourceAmount });
+            // Zufallsauswahl Erz-Typ (könnte später via Parameter gesteuert werden)
+            const type = (Math.random() > 0.5) ? 'ore_iron' : 'ore_ice';
+            
+            this.scene.spawnLoot(this.x, this.y, type, amount);
+        } else {
+            console.warn('GameScene.spawnLoot is not a function!');
+        }
 
-        // 4. Objekt entfernen
+        // 3. Objekt entfernen
         this.destroy();
-    }
-
-    spawnLoot() {
-        // Hier spawnen wir das Erz
-        // Wir nutzen die Loot-Klasse, falls vorhanden
-        if (this.resourceAmount > 0) {
-            new Loot(
-                this.scene, 
-                this.x, 
-                this.y, 
-                this.resourceType, 
-                this.resourceAmount
-            );
-        }
     }
 }
