@@ -55,21 +55,13 @@ js/data/FactionDB.js
 - Event mining-complete: Triggert Bedrohungsanstieg.
 
 ## Letzte Änderung
-- Implementierung der Hive-Mind-Logik und des Beam-Waffensystems.
-- Beam Weapons: Implementiert (Visuals + Instant Hit Logic).
-- Ship Entity: Update für Beam-Support.
-- WeaponSystem: Hybrid-Support (Projektile & Beams).
-- Threat System: Mining triggert Kha'ak Spawns.
+Implementierung der Crafting-Architektur (Backend).
+RecipeDB erstellt (Damage, Cooling, Drag Mods).
+CraftingManager erstellt (Validierung, Ressourcenabzug, Effekt-Anwendung).
+Ship.js vorbereitet für persistente Mods.
 
 ## Aktueller Code-Hash
-- js/core/SectorThreatManager.js
-- js/components/BeamComponent.js
-- js/data/WeaponDB.js
-- js/scenes/GameScene.js
-
-## Aktueller Code-Hash
-- js/components/HealthComponent.js
-- js/components/CargoComponent.js
-- js/entities/Ship.js
-- js/scenes/UIScene.js
-- js/scenes/GameScene.js
+js/data/RecipeDB.js
+js/core/CraftingManager.js
+js/entities/Ship.js
+index.html
