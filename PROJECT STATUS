@@ -27,7 +27,7 @@ Der aktuelle Codebestand umfasst folgende implementierte Module:
 * js/scenes/GameScene.js (Aktives Gameplay / Fliegen)  
 * js/scenes/MapScene.js (Galaxiekarte / Navigation)  
 * js/scenes/UIScene.js (HUD Overlay)  
-* js/scenes/BuilderScene.js (Schiffbau/Editor Modus)
+* js/scenes/BuilderScene.js (Stationsbau/Editor Modus)
 
 ### **Entities (Objekte)**
 
@@ -106,7 +106,7 @@ Basierend auf dem Code-Stand fehlen oder sind folgende Teile work-in-progress:
 1. **UI Polish:** Das StationMenu und UIScene sind funktional, benötigen aber visuelles Styling (CSS/Canvas Overlay Verfeinerung).  
 2. **Mining:** Asteroiden existieren, aber der aktive Abbau-Prozess (Mining-Laser Logik \+ Loot-Generierung aus Asteroiden) muss verifiziert werden.  
 3. **Missions-System:** Der MissionManager ist vorhanden, muss aber mit konkreten Missionstypen (Kill, Transport, Patrol) gefüllt werden.  
-4. **Builder Scene:** Die BuilderScene.js deutet auf Schiffskonfiguration hin. Dies muss mit dem ModuleDB und dem Speichersystem fest verdrahtet werden.
+4. **Builder Scene:** Die BuilderScene.js deutet auf Stationsbau hin. Dies muss mit dem ModuleDB und dem Speichersystem fest verdrahtet werden.
 
 ## **5\. 🔑 Aktueller Code-Hash (Session Memory)**
 
