@@ -56,4 +56,6 @@ export const CONSTANTS = {
     }
 };
 
-
+export const GAME_CONFIG = {
+    SPRITE_SIZE: 32 // Standardgröße in Pixeln für Schiffe/Objekte
+};
