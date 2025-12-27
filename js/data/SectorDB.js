@@ -50,7 +50,7 @@ export const SECTOR_DB = {
         enemies: {
             faction: 'XENON',
             density: 0.8,
-            types: ['xen_s_fighter_n', 'xen_m_corvette_p']
+            types: ['spr_ship_xenon_n', 'spr_ship_xenon_m'] // Asset Keys Updated
         },
         gates: [
             { id: 'gate_south', x: 0, y: 3000, targetSector: 'sec_argon_prime', targetGateId: 'gate_north', name: 'S: Argon Prime' },
@@ -73,7 +73,11 @@ export const SECTOR_DB = {
         mapPosition: { x: -1, y: 0 },
         resources: { ore: 1.0, silicon: 0.8, ice: 0.0, hydrogen: 0.0 },
         hazards: ['radiation'],
-        enemies: { faction: 'XENON', density: 0.3, types: ['xen_s_fighter_n'] },
+        enemies: { 
+            faction: 'XENON', 
+            density: 0.3, 
+            types: ['spr_ship_xenon_n'] // Asset Keys Updated
+        },
         gates: [
             { id: 'gate_east', x: 3000, y: 0, targetSector: 'sec_argon_prime', targetGateId: 'gate_west', name: 'E: Argon Prime' },
             { id: 'gate_west', x: -3000, y: 0, targetSector: 'sec_getsu_fune', targetGateId: 'gate_east', name: 'W: Getsu Fune' }
@@ -91,10 +95,14 @@ export const SECTOR_DB = {
         description: 'Einstige Heimat legendärer Schlachten, heute Rückgrat der Ost-Flanke.',
         background: 'bg_stars_01',
         music: 'mus_ambience_deep_space',
-        mapPosition: { x: 1, y: 0 }, // East of Argon Prime (via 2nd Contact logic in X4, but simplified here)
+        mapPosition: { x: 1, y: 1 }, // FIXED: East of Second Contact (0,1)
         resources: { ore: 0.4, silicon: 0.4, ice: 0.0, hydrogen: 0.5 },
         hazards: [],
-        enemies: { faction: 'XENON', density: 0.1, types: ['xen_s_fighter_n'] },
+        enemies: { 
+            faction: 'XENON', 
+            density: 0.1, 
+            types: ['spr_ship_xenon_n'] // Asset Keys Updated
+        },
         gates: [
             { id: 'gate_west', x: -3000, y: 0, targetSector: 'sec_second_contact', targetGateId: 'gate_east', name: 'W: Second Contact' },
             { id: 'gate_east', x: 3000, y: 0, targetSector: 'sec_grand_exchange', targetGateId: 'gate_west', name: 'E: Grand Exchange' }
@@ -118,7 +126,11 @@ export const SECTOR_DB = {
         mapPosition: { x: -2, y: 0 },
         resources: { ore: 0.3, silicon: 0.3, ice: 1.0, hydrogen: 0.0 },
         hazards: [],
-        enemies: { faction: 'XENON', density: 0.5, types: ['xen_s_fighter_n', 'xen_m_corvette_p'] }, // Savage Spur influx
+        enemies: { 
+            faction: 'XENON', 
+            density: 0.5, 
+            types: ['spr_ship_xenon_n', 'spr_ship_xenon_m'] // Asset Keys Updated
+        }, 
         gates: [
             { id: 'gate_east', x: 3000, y: 0, targetSector: 'sec_the_void', targetGateId: 'gate_west', name: 'E: The Void' },
             { id: 'gate_north', x: 0, y: -3000, targetSector: 'sec_asteroid_belt', targetGateId: 'gate_south', name: 'N: Asteroid Belt' }
@@ -160,10 +172,14 @@ export const SECTOR_DB = {
         description: 'Der zentrale Handelsknotenpunkt des bekannten Universums. Profituuu!',
         background: 'bg_stars_01',
         music: 'mus_ambience_deep_space',
-        mapPosition: { x: 2, y: 0 },
+        mapPosition: { x: 2, y: 1 }, // FIXED: East of Black Hole Sun (1,1)
         resources: { ore: 0.5, silicon: 0.5, ice: 0.5, hydrogen: 0.5 },
         hazards: [],
-        enemies: { faction: 'XENON', density: 0.2, types: ['xen_s_fighter_n'] },
+        enemies: { 
+            faction: 'XENON', 
+            density: 0.2, 
+            types: ['spr_ship_xenon_n'] // Asset Keys Updated
+        },
         gates: [
             { id: 'gate_west', x: -3000, y: 0, targetSector: 'sec_black_hole_sun', targetGateId: 'gate_east', name: 'W: Black Hole Sun' },
             { id: 'gate_north', x: 0, y: -3000, targetSector: 'sec_ianamus_zura', targetGateId: 'gate_south', name: 'N: Ianamus Zura' },
@@ -171,7 +187,7 @@ export const SECTOR_DB = {
         ],
         stations: [
             { type: 'spr_station_hub_terran', x: 0, y: 0, name: 'Teladi Trade Station' },
-            { type: 'spr_station_dock_arm', x: 2000, y: 2000, name: 'Spaceweed Factory' } // Flavor text
+            { type: 'spr_station_dock_arm', x: 2000, y: 2000, name: 'Spaceweed Factory' } 
         ]
     },
 
@@ -183,10 +199,14 @@ export const SECTOR_DB = {
         description: 'Frontsektor gegen die Xenon Matrix. Hier wird hart gekämpft.',
         background: 'bg_stars_01',
         music: 'mus_combat_low',
-        mapPosition: { x: 2, y: -1 },
+        mapPosition: { x: 2, y: 0 }, // FIXED: North of Grand Exchange (2,1)
         resources: { ore: 0.8, silicon: 0.0, ice: 0.0, hydrogen: 0.0 },
         hazards: [],
-        enemies: { faction: 'XENON', density: 0.6, types: ['xen_s_fighter_m', 'xen_m_corvette_p'] },
+        enemies: { 
+            faction: 'XENON', 
+            density: 0.6, 
+            types: ['spr_ship_xenon_n', 'spr_ship_xenon_m'] // Asset Keys Updated
+        },
         gates: [
             { id: 'gate_south', x: 0, y: 3000, targetSector: 'sec_grand_exchange', targetGateId: 'gate_north', name: 'S: Grand Exchange' },
             { id: 'gate_east', x: 3000, y: 0, targetSector: 'sec_matrix_451', targetGateId: 'gate_west', name: 'E: Matrix #451' }
@@ -205,9 +225,13 @@ export const SECTOR_DB = {
         background: 'bg_stars_01',
         music: 'mus_ambience_void',
         mapPosition: { x: 1, y: -1 },
-        resources: { ore: 0.0, silicon: 0.0, ice: 0.0, hydrogen: 0.0 }, // Empty space
+        resources: { ore: 0.0, silicon: 0.0, ice: 0.0, hydrogen: 0.0 }, 
         hazards: [],
-        enemies: { faction: 'PIRATE', density: 0.5, types: ['arg_s_scout_discoverer'] }, // Pirate placeholders
+        enemies: { 
+            faction: 'PIRATE', 
+            density: 0.5, 
+            types: ['spr_ship_arg_scout'] // Asset Keys Updated
+        }, 
         gates: [
             { id: 'gate_west', x: -3000, y: 0, targetSector: 'sec_hatikvahs_choice', targetGateId: 'gate_east', name: 'W: Hatikvah' }
         ],
@@ -230,7 +254,11 @@ export const SECTOR_DB = {
         mapPosition: { x: 0, y: 1 },
         resources: { ore: 0.5, silicon: 0.5, ice: 0.0, hydrogen: 0.6 },
         hazards: [],
-        enemies: { faction: 'HOP', density: 0.4, types: ['par_s_fighter_perseus'] },
+        enemies: { 
+            faction: 'HOP', 
+            density: 0.4, 
+            types: ['spr_ship_par_fighter'] // Asset Keys Updated (Assumption)
+        },
         gates: [
             { id: 'gate_north', x: 0, y: -3000, targetSector: 'sec_argon_prime', targetGateId: 'gate_south', name: 'N: Argon Prime' },
             { id: 'gate_east', x: 3000, y: 0, targetSector: 'sec_black_hole_sun', targetGateId: 'gate_west', name: 'E: Black Hole Sun' },
@@ -252,7 +280,11 @@ export const SECTOR_DB = {
         mapPosition: { x: 0, y: 2 },
         resources: { ore: 0.8, silicon: 0.8, ice: 0.0, hydrogen: 0.0 },
         hazards: [],
-        enemies: { faction: 'PAR', density: 0.3, types: ['par_s_fighter_perseus'] }, // Enemy to Godrealm
+        enemies: { 
+            faction: 'PAR', 
+            density: 0.3, 
+            types: ['spr_ship_par_fighter'] // Asset Keys Updated
+        }, 
         gates: [
             { id: 'gate_north', x: 0, y: -3000, targetSector: 'sec_second_contact', targetGateId: 'gate_south', name: 'N: Second Contact' }
         ],
@@ -270,7 +302,7 @@ export const SECTOR_DB = {
         description: 'Ein Ort der Ruhe und Meditation... und schwerer Kreuzer.',
         background: 'bg_stars_01',
         music: 'mus_ambience_deep_space',
-        mapPosition: { x: 2, y: 1 },
+        mapPosition: { x: 2, y: 2 }, // FIXED: South of Grand Exchange (2,1)
         resources: { ore: 0.3, silicon: 0.3, ice: 0.3, hydrogen: 0.3 },
         hazards: [],
         enemies: null,
@@ -294,15 +326,18 @@ export const SECTOR_DB = {
         background: 'bg_stars_01',
         music: 'mus_combat_low',
         mapPosition: { x: 0, y: -2 },
-        resources: { ore: 2.0, silicon: 2.0, ice: 2.0, hydrogen: 2.0 }, // High risk, high reward
+        resources: { ore: 2.0, silicon: 2.0, ice: 2.0, hydrogen: 2.0 }, 
         hazards: ['radiation', 'mines'],
-        enemies: { faction: 'XENON', density: 2.0, types: ['xen_s_fighter_m', 'xen_m_corvette_p'] }, // Swarm
+        enemies: { 
+            faction: 'XENON', 
+            density: 2.0, 
+            types: ['spr_ship_xenon_n', 'spr_ship_xenon_m'] // Asset Keys Updated
+        },
         gates: [
             { id: 'gate_south', x: 0, y: 3000, targetSector: 'sec_hatikvahs_choice', targetGateId: 'gate_north', name: 'S: Hatikvah' },
             { id: 'gate_north', x: 0, y: -3000, targetSector: 'sec_zyarths_dominion', targetGateId: 'gate_south', name: 'N: Zyarth' }
         ],
         stations: [
-            // Xenon Stations (Placeholder: Using standard assets but treating as enemy)
             { type: 'spr_station_hub_terran', x: 0, y: 0, name: 'Xenon Solar Power Plant' }
         ]
     },
@@ -315,10 +350,14 @@ export const SECTOR_DB = {
         description: 'WARNUNG: Xenon Kernsektor.',
         background: 'bg_stars_01',
         music: 'mus_combat_low',
-        mapPosition: { x: 3, y: -1 },
+        mapPosition: { x: 3, y: 0 }, // FIXED: East of Ianamus Zura (2,0)
         resources: { ore: 0.0, silicon: 0.0, ice: 0.0, hydrogen: 0.0 },
         hazards: [],
-        enemies: { faction: 'XENON', density: 1.5, types: ['xen_s_fighter_m'] },
+        enemies: { 
+            faction: 'XENON', 
+            density: 1.5, 
+            types: ['spr_ship_xenon_n', 'spr_ship_xenon_m'] // Asset Keys Updated
+        },
         gates: [
             { id: 'gate_west', x: -3000, y: 0, targetSector: 'sec_ianamus_zura', targetGateId: 'gate_east', name: 'W: Ianamus Zura' }
         ],
@@ -339,7 +378,11 @@ export const SECTOR_DB = {
         mapPosition: { x: 0, y: -3 },
         resources: { ore: 1.2, silicon: 0.2, ice: 0.0, hydrogen: 0.0 },
         hazards: [],
-        enemies: { faction: 'XENON', density: 0.7, types: ['xen_s_fighter_m'] },
+        enemies: { 
+            faction: 'XENON', 
+            density: 0.7, 
+            types: ['spr_ship_xenon_n'] // Asset Keys Updated
+        },
         gates: [
             { id: 'gate_south', x: 0, y: 3000, targetSector: 'sec_tharkas_cascade', targetGateId: 'gate_north', name: 'S: Tharka (Blockade)' }
         ],
@@ -359,5 +402,3 @@ export function getSector(id) {
     console.warn(`SectorDB: Unknown Sector ID '${id}'`);
     return SECTOR_DB['sec_argon_prime']; // Fallback
 }
-
-
