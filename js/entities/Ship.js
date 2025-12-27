@@ -1,183 +1,100 @@
-// FILE: js/entities/Ship.js
+import { HealthComponent } from '../components/HealthComponent.js';
+import { CargoComponent } from '../components/CargoComponent.js';
+import { WeaponSystem } from './WeaponSystem.js';
+import { EventsCenter } from '../core/EventsCenter.js';
 
-/**
- * 📘 PROJECT: VOID MERCHANT
- * MODULE: SHIP ENTITY
- * * Basis-Klasse für steuerbare Schiffe.
- * * UPDATE Phase 2: Refactored to use Components (Health & Cargo).
- */
-
-import WeaponSystem from './WeaponSystem.js';
-import { getShipStats } from '../data/ShipDB.js';
-import events from '../core/EventsCenter.js';
-import HealthComponent from '../components/HealthComponent.js'; // NEU
-import CargoComponent from '../components/CargoComponent.js';   // NEU
-
-export default class Ship extends Phaser.Physics.Arcade.Sprite {
-    constructor(scene, x, y, shipId, projectileManager) {
-        // 1. LOAD STATS
-        const dbStats = getShipStats(shipId);
-        const texture = 'spr_ship_terran_fighter'; // TODO: Dynamic Texture based on ID
-
+export class Ship extends Phaser.Physics.Arcade.Sprite {
+    constructor(scene, x, y, texture, config = {}) {
         super(scene, x, y, texture);
-
+        
         this.scene = scene;
-        this.id = shipId; // Achtung: Das ist die SHIP_TYPE_ID. Für Instances bräuchten wir UUIDs. 
-                          // Für Player okay, für NPCs später eindeutige ID generieren!
-        // FIX: Wir weisen dem Player eine eindeutige Instance ID zu, wenn er Player ist
-        if (shipId === 'player_ship') { 
-             // Logic handled externally usually, but strictly speaking this.id refers to DB ID currently.
-             // We assign a property 'instanceId' for Events.
-             this.instanceId = 'player';
-        } else {
-             this.instanceId = `ship_${Date.now()}_${Math.random()}`;
-        }
-        // Override id getter for components to work with 'player' check in UI
-        Object.defineProperty(this, 'id', { value: this.instanceId, writable: true });
-
-
         this.scene.add.existing(this);
         this.scene.physics.add.existing(this);
 
-        // --- IFF IDENTIFICATION ---
-        this.faction = dbStats.faction || 'ARG';
+        // --- Config ---
+        this.shiptype = config.shiptype || 'fighter';
+        this.speed = config.speed || 200;
+        this.turnSpeed = config.turnSpeed || 150;
+        this.faction = config.faction || 'neutral';
 
-        // --- COMPONENTS SETUP (REFACTOR) ---
-        // Stats Container for Metadata (Name, Class)
-        this.meta = {
-            name: dbStats.name,
-            class: dbStats.class,
-            basePrice: dbStats.price
-        };
+        // --- Physics Setup ---
+        this.setDamping(true);
+        this.setDrag(0.95); // Space drift effect
+        this.setMaxVelocity(this.speed);
+        
+        // --- Components ---
+        // Health: HP, Shields handled by component
+        this.health = new HealthComponent(this, config.hp || 100, config.shield || 50);
+        
+        // Cargo: Capacity handled by component
+        this.cargo = new CargoComponent(this, config.cargoSpace || 20);
 
-        // 1. Health Component (Replaces stats.hull/shield)
-        this.health = new HealthComponent(this.scene, this, dbStats.hull, dbStats.shield);
+        // Weapons: Slots and firing handled by system
+        this.weaponSystem = new WeaponSystem(this.scene, this);
 
-        // 2. Cargo Component (Replaces stats.cargo)
-        this.cargo = new CargoComponent(this, dbStats.cargo);
+        // --- MODIFICATION SYSTEM (NEW) ---
+        // Speichert installierte Mods für SaveSystem und Logik
+        this.installedMods = config.installedMods || []; 
 
-        // 3. Credits (Only relevant for Player, logic kept simpler via property + event)
-        this._credits = 0;
+        // --- Input States ---
+        this.cursors = null;
+        this.keys = {};
+        this.isPlayer = false; // Flag if controlled by player
 
-        // --- PROXY FOR CREDITS EVENT ---
-        Object.defineProperty(this, 'credits', {
-            get: () => this._credits,
-            set: (value) => {
-                const old = this._credits;
-                this._credits = value;
-                if (old !== value) {
-                    events.emit('update-credits', this._credits);
-                }
-            },
-            enumerable: true,
-            configurable: true
+        // Init Events
+        this.on('destroy', this.onDestroy, this);
+    }
+
+    setupPlayerControl() {
+        this.isPlayer = true;
+        this.cursors = this.scene.input.keyboard.createCursorKeys();
+        this.keys = this.scene.input.keyboard.addKeys({
+            fire: Phaser.Input.Keyboard.KeyCodes.SPACE,
+            interact: Phaser.Input.Keyboard.KeyCodes.F
         });
-
-        // --- VISUAL SCALING ---
-        let targetSize = 64;
-        if (this.meta.class === 'M') targetSize = 128;
-        if (this.meta.class === 'L') targetSize = 256;
-        if (this.meta.class === 'XL') targetSize = 512;
-
-        this.setDisplaySize(targetSize, targetSize);
-        const hitboxSize = targetSize * 0.8;
-        this.body.setSize(hitboxSize, hitboxSize);
-        this.body.setOffset((this.width - hitboxSize) / 2, (this.height - hitboxSize) / 2);
-
-        // --- PHYSICS CONFIGURATION ---
-        this.speed = dbStats.speed;
-        this.strafeSpeed = this.speed * 0.6;
-        this.turnSpeed = dbStats.turnSpeed;
-        this.baseDrag = 0.92;
-        this.brakeDrag = 0.05;
-
-        this.body.setDamping(true);
-        this.body.setDrag(this.baseDrag);
-        this.body.setAngularDrag(0.50);
-        this.body.setMaxVelocity(this.speed * 3.0);
-        this.body.setCollideWorldBounds(false);
-
-        // --- WEAPON SYSTEM ---
-        if (projectileManager) {
-            this.weaponSystem = new WeaponSystem(this.scene, this, projectileManager);
-            this.weaponSystem.equip('wpn_laser_pulse_s');
-        }
+        
+        // Kamera folgt dem Spieler
+        this.scene.cameras.main.startFollow(this);
     }
 
-    /**
-     * Delegiert Schaden an die HealthComponent
-     */
-    takeDamage(amount) {
-        this.health.takeDamage(amount);
-        // Visual Shake if Player
-        if (this.id === 'player') {
-            this.scene.cameras.main.shake(100, 0.005);
-        }
-    }
+    update(time, delta) {
+        if (!this.active) return;
 
-    /**
-     * Wrapper für Cargo Add (Kompatibilität)
-     */
-    addCargo(wareId, amount) {
-        return this.cargo.add(wareId, amount);
-    }
-
-    update(input, time, delta) {
-        if (!input) return;
-        if (!this.body) return;
-        if (this.health.isDead) return;
-
-        // UPDATE COMPONENTS
+        // Komponenten Updates
         this.health.update(time, delta);
-        if (this.weaponSystem) this.weaponSystem.update(input, time);
+        this.weaponSystem.update(time, delta);
 
-        // 1. ROTATION
-        const aimPos = input.getAimPosition();
-        const targetAngle = Phaser.Math.Angle.Between(this.x, this.y, aimPos.x, aimPos.y);
-        let diff = Phaser.Math.Angle.Wrap(targetAngle - this.rotation);
+        // Movement Logic
+        if (this.isPlayer) {
+            this.handlePlayerInput(delta);
+        } else {
+            // AI Logic placeholder
+        }
+    }
 
-        if (Math.abs(diff) < 0.05) {
+    handlePlayerInput(delta) {
+        if (this.cursors.up.isDown) {
+            this.scene.physics.velocityFromRotation(this.rotation, this.speed, this.body.acceleration);
+        } else {
+            this.body.setAcceleration(0);
+        }
+
+        if (this.cursors.left.isDown) {
+            this.setAngularVelocity(-this.turnSpeed);
+        } else if (this.cursors.right.isDown) {
+            this.setAngularVelocity(this.turnSpeed);
+        } else {
             this.setAngularVelocity(0);
-            this.setRotation(targetAngle);
-        } else {
-            this.setAngularVelocity(diff * this.turnSpeed);
         }
 
-        // 2. BRAKE LOGIC
-        if (input.getBrake()) {
-            this.body.setDrag(this.brakeDrag);
-            this.setAcceleration(0);
-            return;
-        } else {
-            this.body.setDrag(this.baseDrag);
+        // Shooting
+        if (this.keys.fire.isDown) {
+            this.weaponSystem.fire();
         }
+    }
 
-        // 3. MOVEMENT
-        const moveVec = input.getMoveVector();
-        this.setAcceleration(0);
-
-        if (moveVec.y !== 0) {
-            let currentThrust = (moveVec.y > 0) ? this.speed : this.speed * 0.5;
-            if (moveVec.y > 0 && input.getBoost && input.getBoost()) {
-                currentThrust *= 2.5;
-            }
-            this.scene.physics.velocityFromRotation(
-                this.rotation,
-                currentThrust * moveVec.y,
-                this.body.acceleration
-            );
-        }
-
-        if (moveVec.x !== 0) {
-            const strafeAngle = this.rotation + (Math.PI / 2);
-            const strafeAccel = this.scene.physics.velocityFromRotation(
-                strafeAngle,
-                this.strafeSpeed * moveVec.x
-            );
-            this.body.acceleration.x += strafeAccel.x;
-            this.body.acceleration.y += strafeAccel.y;
-        }
+    onDestroy() {
+        // Cleanup if needed
+        if (this.health) this.health.destroy();
     }
 }
-
-
