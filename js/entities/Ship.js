@@ -5,36 +5,35 @@
  * MODULE: SHIP ENTITY
  * * Basis-Klasse für steuerbare Schiffe.
  * * UPDATE Phase 2: Refactored to use Components (Health & Cargo).
+ * * UPDATE FIX: Added Guard Clause for scene/body existence.
  */
 
 import WeaponSystem from './WeaponSystem.js';
 import { getShipStats } from '../data/ShipDB.js';
 import events from '../core/EventsCenter.js';
-import HealthComponent from '../components/HealthComponent.js'; // NEU
-import CargoComponent from '../components/CargoComponent.js';   // NEU
+import HealthComponent from '../components/HealthComponent.js'; 
+import CargoComponent from '../components/CargoComponent.js';   
 
 export default class Ship extends Phaser.Physics.Arcade.Sprite {
     constructor(scene, x, y, shipId, projectileManager) {
         // 1. LOAD STATS
         const dbStats = getShipStats(shipId);
-        const texture = 'spr_ship_terran_fighter'; // TODO: Dynamic Texture based on ID
+        // Fallback für Textur, falls DB undefined liefert
+        const texture = 'spr_ship_terran_fighter'; 
 
         super(scene, x, y, texture);
 
         this.scene = scene;
-        this.id = shipId; // Achtung: Das ist die SHIP_TYPE_ID. Für Instances bräuchten wir UUIDs. 
-                          // Für Player okay, für NPCs später eindeutige ID generieren!
-        // FIX: Wir weisen dem Player eine eindeutige Instance ID zu, wenn er Player ist
+        this.id = shipId; 
+        
+        // Instance ID logic
         if (shipId === 'player_ship') { 
-             // Logic handled externally usually, but strictly speaking this.id refers to DB ID currently.
-             // We assign a property 'instanceId' for Events.
              this.instanceId = 'player';
         } else {
              this.instanceId = `ship_${Date.now()}_${Math.random()}`;
         }
-        // Override id getter for components to work with 'player' check in UI
+        
         Object.defineProperty(this, 'id', { value: this.instanceId, writable: true });
-
 
         this.scene.add.existing(this);
         this.scene.physics.add.existing(this);
@@ -43,20 +42,19 @@ export default class Ship extends Phaser.Physics.Arcade.Sprite {
         this.faction = dbStats.faction || 'ARG';
 
         // --- COMPONENTS SETUP (REFACTOR) ---
-        // Stats Container for Metadata (Name, Class)
         this.meta = {
             name: dbStats.name,
             class: dbStats.class,
             basePrice: dbStats.price
         };
 
-        // 1. Health Component (Replaces stats.hull/shield)
+        // 1. Health Component
         this.health = new HealthComponent(this.scene, this, dbStats.hull, dbStats.shield);
 
-        // 2. Cargo Component (Replaces stats.cargo)
+        // 2. Cargo Component
         this.cargo = new CargoComponent(this, dbStats.cargo);
 
-        // 3. Credits (Only relevant for Player, logic kept simpler via property + event)
+        // 3. Credits
         this._credits = 0;
 
         // --- PROXY FOR CREDITS EVENT ---
@@ -104,10 +102,10 @@ export default class Ship extends Phaser.Physics.Arcade.Sprite {
         }
     }
 
-    /**
-     * Delegiert Schaden an die HealthComponent
-     */
     takeDamage(amount) {
+        // Safety Check
+        if (!this.scene || !this.active) return;
+        
         this.health.takeDamage(amount);
         // Visual Shake if Player
         if (this.id === 'player') {
@@ -115,36 +113,38 @@ export default class Ship extends Phaser.Physics.Arcade.Sprite {
         }
     }
 
-    /**
-     * Wrapper für Cargo Add (Kompatibilität)
-     */
     addCargo(wareId, amount) {
         return this.cargo.add(wareId, amount);
     }
 
     update(input, time, delta) {
-        if (!input) return;
-        if (!this.body) return;
+        // --- GUARD CLAUSE: Preventing Crash ---
+        // Wenn das Objekt zerstört wurde oder die Szene wechselt, brechen wir sofort ab.
+        if (!this.scene || !this.body || !this.active) return;
+        
         if (this.health.isDead) return;
 
         // UPDATE COMPONENTS
         this.health.update(time, delta);
         if (this.weaponSystem) this.weaponSystem.update(input, time);
+        if (!input) return; // NPC Schiffe haben ggf. keinen Input, Logik folgt später
 
         // 1. ROTATION
         const aimPos = input.getAimPosition();
-        const targetAngle = Phaser.Math.Angle.Between(this.x, this.y, aimPos.x, aimPos.y);
-        let diff = Phaser.Math.Angle.Wrap(targetAngle - this.rotation);
+        if (aimPos) {
+            const targetAngle = Phaser.Math.Angle.Between(this.x, this.y, aimPos.x, aimPos.y);
+            let diff = Phaser.Math.Angle.Wrap(targetAngle - this.rotation);
 
-        if (Math.abs(diff) < 0.05) {
-            this.setAngularVelocity(0);
-            this.setRotation(targetAngle);
-        } else {
-            this.setAngularVelocity(diff * this.turnSpeed);
+            if (Math.abs(diff) < 0.05) {
+                this.setAngularVelocity(0);
+                this.setRotation(targetAngle);
+            } else {
+                this.setAngularVelocity(diff * this.turnSpeed);
+            }
         }
 
         // 2. BRAKE LOGIC
-        if (input.getBrake()) {
+        if (input.getBrake && input.getBrake()) {
             this.body.setDrag(this.brakeDrag);
             this.setAcceleration(0);
             return;
@@ -154,6 +154,8 @@ export default class Ship extends Phaser.Physics.Arcade.Sprite {
 
         // 3. MOVEMENT
         const moveVec = input.getMoveVector();
+        if (!moveVec) return;
+        
         this.setAcceleration(0);
 
         if (moveVec.y !== 0) {
@@ -179,5 +181,3 @@ export default class Ship extends Phaser.Physics.Arcade.Sprite {
         }
     }
 }
-
-
