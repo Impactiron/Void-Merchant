@@ -5,8 +5,10 @@
  * MODULE: ASTEROID ENTITY
  * * Zerstörbares Umgebungsobjekt.
  * * UPDATE: Trigger Loot Drop on Destroy
- * * UPDATE FIX: Added Guard Clause and Scene Check
+ * * UPDATE: Auto-Scaling via SpriteHelper
  */
+
+import { enforceSpriteSize } from '../core/SpriteHelper.js'; // NEU
 
 export default class Asteroid extends Phaser.Physics.Arcade.Sprite {
     constructor(scene, x, y, size = 'medium') {
@@ -57,29 +59,24 @@ export default class Asteroid extends Phaser.Physics.Arcade.Sprite {
                 break;
         }
 
-        // VISUAL SCALING
-        this.setDisplaySize(targetDiameter, targetDiameter);
+        // AUTO-SCALING
+        // Nutzt den Helper, um Größe und Physics-Body (Kreis) zu setzen
+        enforceSpriteSize(this, targetDiameter, true); // true = Circle Hitbox
 
-        // HITBOX SCALING
-        const hitboxRadius = (this.width / 2) * 0.85;
-        const offset = (this.width - (hitboxRadius * 2)) / 2;
-        this.body.setCircle(hitboxRadius, offset, offset);
+        // Feinjustierung der Hitbox (etwas kleiner als das Bild für Fairness)
+        // Da enforceSpriteSize den Body auf volle Breite setzt, reduzieren wir hier leicht
+        const hitboxRadius = (targetDiameter / 2) * 0.85;
+        this.body.setCircle(hitboxRadius);
+        
+        // Offset Zentrierung: (VisualSize - HitboxDiameter) / 2
+        const offset = (targetDiameter - (hitboxRadius * 2)) / 2;
+        this.body.setOffset(offset, offset);
+        
         this.body.setMass(this.mass);
-
         this.maxHp = this.hp;
     }
 
-    update() {
-        // --- GUARD CLAUSE ---
-        // Verhindert Crash, falls Objekt noch in Update-Liste, aber schon zerstört
-        if (!this.scene || !this.body || !this.active) return;
-        
-        // (Optional: Hier könnte Rotation-Damping rein oder Drift-Logik)
-    }
-
     takeDamage(amount) {
-        if (!this.scene || !this.active) return;
-
         this.hp -= amount;
 
         // Visual Feedback: Flash Red
@@ -94,8 +91,6 @@ export default class Asteroid extends Phaser.Physics.Arcade.Sprite {
     }
 
     destroyAsteroid() {
-        if (!this.scene) return;
-
         // 1. FX
         if (this.scene.fxManager) {
             let scale = 1.0;
@@ -105,14 +100,11 @@ export default class Asteroid extends Phaser.Physics.Arcade.Sprite {
         }
 
         // 2. LOOT DROP
-        // Wir rufen die spawnLoot Funktion der Scene auf
         if (typeof this.scene.spawnLoot === 'function') {
-            // Menge basierend auf Größe
             let amount = 1;
             if (this.sizeCategory === 'medium') amount = Phaser.Math.Between(2, 5);
             if (this.sizeCategory === 'large') amount = Phaser.Math.Between(5, 10);
             
-            // Zufälliger Ware-Drop (Simuliert)
             const type = (Math.random() > 0.5) ? 'ore_iron' : 'ore_ice';
             
             this.scene.spawnLoot(this.x, this.y, type, amount);
