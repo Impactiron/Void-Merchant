@@ -2,6 +2,7 @@
  * 📘 PROJECT: VOID MERCHANT
  * MODULE: WEAPON DATABASE
  * * Stats für alle Waffen im Spiel.
+ * * UPDATE: Hinzugefügt 'scale' und 'sprite' für visuelle Differenzierung.
  * * Referenz: TDD Volume 7.
  */
 
@@ -17,6 +18,8 @@ export const WEAPON_DB = {
         speed: 1800,
         range: 1200,
         color: 0xff0000, // Red
+        sprite: 'spr_proj_laser_red', // Standard Asset
+        scale: 1.0,      // Standard Größe
         price: 2500,
         description: 'Standard fighter weapon. Reliable against shields.'
     },
@@ -28,6 +31,8 @@ export const WEAPON_DB = {
         speed: 1800,
         range: 1400,
         color: 0xff3333,
+        sprite: 'spr_proj_laser_red',
+        scale: 1.3,      // 30% Größer als Mk1
         price: 8500,
         description: 'Upgraded pulse laser with higher damage output.'
     },
@@ -41,6 +46,8 @@ export const WEAPON_DB = {
         speed: 1200,
         range: 1500,
         color: 0xffff00, // Yellow
+        sprite: 'spr_proj_laser_red', // Placeholder, später eigenes Asset
+        scale: 0.8,      // Kleiner, kompakter Schuss
         price: 4500,
         description: 'Physical rounds that shred hull armor. Requires leading.'
     },
@@ -54,6 +61,8 @@ export const WEAPON_DB = {
         speed: 1600,
         range: 1000,
         color: 0xffaa00, // Orange
+        sprite: 'spr_proj_laser_red',
+        scale: 0.6,      // Sehr kleine Projektile
         price: 5500,
         description: 'High rate of fire gatling gun. Good for dogfights.'
     },
@@ -61,12 +70,14 @@ export const WEAPON_DB = {
     // 4. BEAM (Instant Hit - Player/Argon Variant)
     'wpn_beam_emitter_s': {
         name: 'Beam Emitter Mk1',
-        type: 'BEAM',         // CHANGED TO BEAM
-        damage: 5,            // Low damage PER TICK/UPDATE
-        fireRate: 60.0,       // Fires every frame theoretically
-        speed: 0,             // Instant
+        type: 'BEAM',         
+        damage: 5,            
+        fireRate: 60.0,       
+        speed: 0,             
         range: 1000,
-        color: 0x00d4ff,      // Argon Blue
+        color: 0x00d4ff,      
+        sprite: null,         // Beams nutzen kein Projektil-Sprite
+        scale: 1.0,
         price: 12000,
         description: 'Pinpoint accuracy beam laser. Perfect against fast scouts.'
     },
@@ -80,6 +91,8 @@ export const WEAPON_DB = {
         speed: 500, // Very Slow
         range: 2500,
         color: 0x00ff00, // Green
+        sprite: 'spr_proj_plasma_green', // Neues Asset nutzen
+        scale: 2.5,      // Sehr groß!
         price: 15000,
         description: 'Slow moving plasma balls. Devastating against stations and large ships.'
     },
@@ -87,12 +100,14 @@ export const WEAPON_DB = {
     // --- KHAAK WEAPONS (Enemy Only) ---
     'wpn_kyon_emitter_s': {
         name: 'Kyon Emitter (Alpha)',
-        type: 'BEAM',         // CRITICAL: Type set to BEAM for logic switch
-        damage: 2,            // Very low damage but continuous hit
+        type: 'BEAM',         
+        damage: 2,            
         fireRate: 60.0,       
-        speed: 0,             // Instant
-        range: 1500,          // High range
-        color: 0xff00ff,      // Purple
+        speed: 0,             
+        range: 1500,          
+        color: 0xff00ff,      
+        sprite: null,
+        scale: 1.0,
         price: 0,
         description: 'Alien beam technology.'
     }
@@ -101,5 +116,3 @@ export const WEAPON_DB = {
 export function getWeapon(id) {
     return WEAPON_DB[id] || WEAPON_DB['wpn_laser_pulse_s'];
 }
-
-
