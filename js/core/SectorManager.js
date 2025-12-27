@@ -1,54 +1,74 @@
-import events from './EventsCenter.js';
-import { SectorDB } from '../data/SectorDB.js';
+import { SECTOR_DB } from '../data/SectorDB.js';
+// Wir importieren Asteroid vorerst als Default, falls es noch einer ist, 
+// aber idealerweise stellen wir später alles um. 
+// Da der Prompt nur spezifische Dateien nannte, lasse ich Asteroid Import defensiv.
+import Asteroid from '../entities/Asteroid.js'; 
+import { EventsCenter } from './EventsCenter.js';
 
-export class SectorManager {
+export default class SectorManager {
     constructor(scene) {
         this.scene = scene;
-        this.currentSectorId = 'sector_01'; // Start Sektor
-        this.visitedSectors = new Set(['sector_01']);
+        this.currentSectorId = null;
+        this.activeEntities = [];
     }
 
-    init() {
-        console.log(`SectorManager initialisiert. Start-Sektor: ${this.currentSectorId}`);
-    }
-
-    getCurrentSector() {
-        return SectorDB.find(s => s.id === this.currentSectorId);
-    }
-
-    // Wechselt den Sektor, lädt neue Daten und feuert Events
-    changeSector(gateId) {
-        // Logik um herauszufinden, wohin das Tor führt
-        // Hier vereinfacht: Wir simulieren, dass wir wissen, wohin es geht.
-        // In einer echten Implementierung würde das Gate-Objekt die Ziel-ID enthalten.
-        
-        // Dummy-Logic für Prototyping:
-        // Wenn wir in sector_01 sind, und ein Gate nutzen, gehen wir zu sector_02 (falls vorhanden)
-        const targetSectorId = this.currentSectorId === 'sector_01' ? 'sector_02' : 'sector_01';
-        
-        const targetSector = SectorDB.find(s => s.id === targetSectorId);
-
-        if (!targetSector) {
-            console.warn(`Ziel-Sektor ${targetSectorId} nicht in DB gefunden.`);
+    /**
+     * Lädt einen Sektor und erstellt alle statischen Objekte
+     * @param {string} sectorId 
+     */
+    loadSector(sectorId) {
+        if (!SECTOR_DB[sectorId]) {
+            console.error(`[SectorManager] Sektor ${sectorId} existiert nicht!`);
             return;
         }
 
-        console.log(`Springe von ${this.currentSectorId} nach ${targetSectorId}...`);
+        console.log(`[SectorManager] Loading Sector: ${SECTOR_DB[sectorId].name}`);
+        this.currentSectorId = sectorId;
+        const sectorData = SECTOR_DB[sectorId];
 
-        this.currentSectorId = targetSectorId;
-        this.visitedSectors.add(targetSectorId);
+        // 1. Hintergrund setzen (Einfach Farbe oder später TileSprite)
+        this.scene.cameras.main.setBackgroundColor(0x000010); // Deep Space Black
 
-        // Globales Event feuern, damit GameScene, UniverseSim und UI reagieren können
-        events.emit('sector-changed', {
-            previous: this.currentSectorId,
-            current: targetSector
-        });
+        // 2. Weltgrenzen setzen
+        // Wir nehmen an, ein Sektor ist 20.000 x 20.000 Pixel groß (laut TDD)
+        this.scene.physics.world.setBounds(0, 0, 20000, 20000);
+        
+        // Hintergrund-Gitter/Sterne (Optional TODO)
 
-        // Visuellen Übergangseffekt triggern (optional)
-        // this.scene.cameras.main.fade(500, 0, 0, 0);
+        // 3. Asteroiden spawnen
+        this.spawnAsteroids(sectorData.asteroids);
+
+        // 4. Stationen spawnen (TODO)
+        
+        // 5. Tore spawnen (TODO)
+
+        // Event feuern, dass Sektor geladen ist
+        EventsCenter.emit('sector-loaded', sectorId);
     }
 
-    getSectorInfo(id) {
-        return SectorDB.find(s => s.id === id);
+    spawnAsteroids(config) {
+        // config = { count: 20, type: 'ore' }
+        if (!config) return;
+
+        for (let i = 0; i < config.count; i++) {
+            // Zufällige Position im Sektor
+            const x = Phaser.Math.Between(100, 19900);
+            const y = Phaser.Math.Between(100, 19900);
+
+            // Create Asteroid Entity
+            // Da Asteroid noch ein Default Export ist (laut Analyse), nutzen wir new Asteroid
+            const asteroid = new Asteroid(this.scene, x, y, config.type);
+            this.activeEntities.push(asteroid);
+        }
+    }
+
+    /**
+     * Bereinigt den aktuellen Sektor vor einem Wechsel
+     */
+    clearSector() {
+        this.activeEntities.forEach(entity => {
+            if (entity.destroy) entity.destroy();
+        });
+        this.activeEntities = [];
     }
 }
