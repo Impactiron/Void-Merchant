@@ -4,10 +4,11 @@
  * 📘 PROJECT: VOID MERCHANT
  * MODULE: ENEMY SHIP (AI)
  * * Implementiert einfache Gegner-KI (Chase & Shoot).
- * * UPDATE: Added Faction ID
+ * * UPDATE: Auto-Scaling via SpriteHelper
  */
 
 import WeaponSystem from './WeaponSystem.js';
+import { enforceSpriteSize } from '../core/SpriteHelper.js'; // NEU
 
 export default class EnemyShip extends Phaser.Physics.Arcade.Sprite {
     constructor(scene, x, y, texture, target, projectileManager) {
@@ -32,16 +33,24 @@ export default class EnemyShip extends Phaser.Physics.Arcade.Sprite {
         this.attackRange = 600;
         this.stopRange = 200; 
 
+        // --- VISUAL SCALING (AUTO-SCALER) ---
+        // Feinde standardmäßig etwas größer als Spieler (48px)
+        enforceSpriteSize(this, 48, true); // true = Circle Hitbox
+
+        // Manuelle Hitbox-Korrektur (optional, da Helper schon gute Arbeit leistet)
+        // Wir machen die Hitbox etwas kleiner als das Sprite (Fehlertoleranz)
+        this.body.setCircle(20); 
+        // Offset muss neu berechnet werden, da setCircle den Offset zurücksetzt
+        // Bei 48x48 Sprite und Radius 20 (Durchmesser 40) ist Offset (4,4)
+        this.body.setOffset(4, 4);
+
+
         // --- PHYSICS ---
         this.body.setDamping(true);
         this.body.setDrag(0.7);
         this.body.setAngularDrag(200);
         this.body.setMaxVelocity(300);
         this.body.setCollideWorldBounds(false); 
-
-        // Auto-Scale
-        this.setDisplaySize(48, 48); 
-        this.body.setCircle(20);
 
         // --- WEAPON SYSTEM ---
         if (projectileManager) {
@@ -132,20 +141,14 @@ export default class EnemyShip extends Phaser.Physics.Arcade.Sprite {
     }
 
     explode() {
-        // FX
         if (this.scene.fxManager) {
             this.scene.fxManager.playExplosion(this.x, this.y, 0.8);
         }
-
-        // Loot Drop
         if (typeof this.scene.spawnLoot === 'function') {
             if (Math.random() > 0.5) {
                 this.scene.spawnLoot(this.x, this.y, 'energy_cells', Phaser.Math.Between(5, 20));
             }
         }
-
         this.destroy();
     }
 }
-
-
