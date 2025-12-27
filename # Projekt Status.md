@@ -2074,6 +2074,38 @@ STATUS: Version 0.7.1 (Hive Integration & Beam Weapons)
 * js/data/WeaponDB.js  
 * js/scenes/GameScene.js
 
+# Projekt Status: Void Merchant
+## Dateibaum
+index.html (Updated)
+css/
+style.css
+js/
+core/
+CraftingManager.js (NEU)
+... (alte Core Files)
+data/
+RecipeDB.js (NEU)
+... (alte DB Files)
+entities/
+Ship.js (Updated: installedMods property)
+...
+Globale Variablen & State
+ship.installedMods: Array von Strings (Rezept-IDs), speichert Modifikationen am Spielerschiff.
+RecipeDB: Statische Datenbank für Crafting-Rezepte.
+Letzte Änderung
+Implementierung der Crafting-Architektur (Backend).
+RecipeDB erstellt (Damage, Cooling, Drag Mods).
+CraftingManager erstellt (Validierung, Ressourcenabzug, Effekt-Anwendung).
+Ship.js vorbereitet für persistente Mods.
+Nächster Schritt
+Integration des Craftings in das UI (StationMenu.js), damit der Spieler interagieren kann.
+Testen der Effekte im Gameplay (Schaden, Speed).
+Aktueller Code-Hash
+js/data/RecipeDB.js
+js/core/CraftingManager.js
+js/entities/Ship.js
+index.html
+
 # Struktur
 
 ## **Dateibaum**
