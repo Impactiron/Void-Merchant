@@ -1,10 +1,8 @@
-// FILE: js/scenes/GameScene.js
-
 /**
  * 📘 PROJECT: VOID MERCHANT
  * SCENE: GAME SCENE (Active Sector)
  * * UPDATE Phase 2.1: Integrated SectorThreatManager & Mining Events
- * * UPDATE Fix: Projectile Accessor Pattern implementation
+ * * FIX: Nutzung der getGroup Schnittstelle für Projektile
  */
 
 import InputManager from '../core/InputManager.js';
@@ -16,7 +14,7 @@ import SaveSystem from '../core/SaveSystem.js';
 import AudioManager from '../core/AudioManager.js';
 import MissionManager from '../core/MissionManager.js';
 import SectorManager from '../core/SectorManager.js';
-import SectorThreatManager from '../core/SectorThreatManager.js';
+import SectorThreatManager from '../core/SectorThreatManager.js'; // NEU
 import { CONFIG } from '../core/config.js';
 import StationMenu from '../ui/StationMenu.js';
 import events from '../core/EventsCenter.js';
@@ -154,7 +152,6 @@ export default class GameScene extends Phaser.Scene {
     }
 
     setupCollisions() {
-        // --- PHYSICAL COLLISIONS ---
         this.physics.add.collider(this.player, this.asteroids);
         this.physics.add.collider(this.player, this.stations);
         this.physics.add.collider(this.asteroids, this.asteroids);
@@ -162,51 +159,16 @@ export default class GameScene extends Phaser.Scene {
         this.physics.add.collider(this.enemies, this.enemies);
         this.physics.add.collider(this.player, this.enemies);
 
-        // --- PROJECTILE COLLISIONS (Using getGroup Accessor) ---
+        // Nutzung der neuen Helper-Methode für sauberen Zugriff
+        this.physics.add.overlap(this.projectileManager.getGroup('player'), this.enemies, this.handleLaserHitEnemy, null, this);
+        this.physics.add.overlap(this.projectileManager.getGroup('player'), this.asteroids, this.handleLaserHitAsteroid, null, this);
         
-        // Player shoots Enemies & Asteroids
-        this.physics.add.overlap(
-            this.projectileManager.getGroup('player'), 
-            this.enemies, 
-            this.handleLaserHitEnemy, 
-            null, 
-            this
-        );
-        this.physics.add.overlap(
-            this.projectileManager.getGroup('player'), 
-            this.asteroids, 
-            this.handleLaserHitAsteroid, 
-            null, 
-            this
-        );
-        this.physics.add.overlap(
-            this.projectileManager.getGroup('player'),
-            this.stations,
-            (st, l) => this.projectileManager.killBullet(l)
-        );
-
-        // Enemies shoot Player & Asteroids
-        this.physics.add.overlap(
-            this.projectileManager.getGroup('enemy'), 
-            this.player, 
-            this.handleLaserHitPlayer, 
-            null, 
-            this
-        );
-        this.physics.add.overlap(
-            this.projectileManager.getGroup('enemy'), 
-            this.asteroids, 
-            this.handleLaserHitAsteroid, 
-            null, 
-            this
-        );
-        this.physics.add.overlap(
-            this.projectileManager.getGroup('enemy'),
-            this.stations,
-            (st, l) => this.projectileManager.killBullet(l)
-        );
-
-        // Loot Pickup
+        this.physics.add.overlap(this.projectileManager.getGroup('enemy'), this.player, this.handleLaserHitPlayer, null, this);
+        this.physics.add.overlap(this.projectileManager.getGroup('enemy'), this.asteroids, this.handleLaserHitAsteroid, null, this);
+        
+        this.physics.add.overlap(this.projectileManager.getGroup('enemy'), this.stations, (st, l) => this.projectileManager.killBullet(l));
+        this.physics.add.overlap(this.projectileManager.getGroup('player'), this.stations, (st, l) => this.projectileManager.killBullet(l));
+        
         this.physics.add.overlap(this.player, this.lootGroup, this.handleLootCollection, null, this);
     }
 
