@@ -2,6 +2,7 @@
  * 📘 PROJECT: VOID MERCHANT
  * SCENE: GAME SCENE (Active Sector)
  * * UPDATE Phase 2.1: Integrated SectorThreatManager & Mining Events
+ * * FIX: Safety Checks für Player Data Transfer hinzugefügt
  */
 
 import InputManager from '../core/InputManager.js';
@@ -28,12 +29,7 @@ export default class GameScene extends Phaser.Scene {
         this.currentSectorId = data.targetSector || 'sec_argon_prime';
         this.entryGateId = data.entryGate || null;
         this.transferPlayerData = data.playerData || null;
-        
-        // FIX: Alte Referenzen explizit löschen, um Zombie-Objekte zu verhindern
         this.npcMap.clear();
-        this.bg = null; 
-        this.asteroids = null;
-        this.enemies = null;
     }
 
     preload() {
@@ -140,9 +136,24 @@ export default class GameScene extends Phaser.Scene {
 
         // RESTORE STATE
         if (this.transferPlayerData) {
-            this.player.health.setData(this.transferPlayerData.stats.hullCurrent, this.transferPlayerData.stats.shieldCurrent);
-            this.player.cargo.items = this.transferPlayerData.cargo.items || {};
-            if (this.transferPlayerData.weaponId) this.player.weaponSystem.equip(this.transferPlayerData.weaponId);
+            // Safety Check: Existieren Stats?
+            if (this.transferPlayerData.stats) {
+                this.player.health.setData(
+                    this.transferPlayerData.stats.hullCurrent, 
+                    this.transferPlayerData.stats.shieldCurrent
+                );
+            }
+            
+            // Safety Check: Existiert Cargo?
+            if (this.transferPlayerData.cargo) {
+                this.player.cargo.items = this.transferPlayerData.cargo.items || {};
+            }
+            
+            // Weapon Restore
+            if (this.transferPlayerData.weaponId) {
+                this.player.weaponSystem.equip(this.transferPlayerData.weaponId);
+            }
+            
         } else if (savedData) {
             this.player.credits = savedData.player.credits;
             

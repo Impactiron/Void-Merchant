@@ -1,28 +1,61 @@
-project_memory.md
 # Projekt Status: Void Merchant
 
 ## Dateibaum
-- js/core/config.js (Geändert)
-- js/core/SpriteHelper.js (NEU)
-- js/entities/Ship.js (Geändert)
-- js/entities/EnemyShip.js (Geändert)
-- js/entities/Asteroid.js (Geändert)
-- ... (andere Dateien unverändert)
+- index.html
+- css/style.css
+- README.md
+- js/
+  - core/
+    - config.js
+    - UniverseSim.js
+    - SectorThreatManager.js
+    - SectorManager.js
+    - SaveSystem.js
+    - ProjectileManager.js
+    - PoliticsManager.js
+    - MissionManager.js
+    - InputManager.js
+    - GameLoop.js
+    - FXManager.js
+    - EventsCenter.js
+    - AudioManager.js
+  - data/
+    - WeaponDB.js
+    - WareDB.js
+    - StationDB.js
+    - ShipDB.js
+    - SectorDB.js
+    - ModuleDB.js
+    - FactionDB.js
+  - entities/
+    - WeaponSystem.js
+    - TradeAgent.js
+    - Station.js
+    - Ship.js
+    - Loot.js
+    - Gate.js
+    - EnemyShip.js
+    - Asteroid.js
+  - scenes/
+    - BootScene.js
+    - BuilderScene.js
+    - GameScene.js
+    - MapScene.js
+    - MenuScene.js
+    - UIScene.js
+  - ui/
+    - StationMenu.js
 
 ## Globale Variablen & State
-- `GAME_CONFIG.SPRITE_SIZE`: 32px Standard
-- Helper `enforceSpriteSize` zentralisiert nun alle Scaling-Logik.
+- **gameState**: Verwaltet `player`, `sectorManager`, `threatManager`.
+- **UniverseSim**: Hintergrundsimulation (OOS).
+- **Phaser Scenes**: Aktive Verwaltung von `GameScene` und `UIScene`.
 
 ## Letzte Änderung
-- Globales Auto-Scaling System implementiert. Assets werden nun visuell auf definierte Pixelwerte gezwungen (S=32, M=64, etc.), unabhängig von der Texturauflösung. Physics-Bodies werden entsprechend angepasst.
+- `GameScene.js`: Bugfix für `createPlayer` implementiert. Safety-Checks für `transferPlayerData` (stats, cargo) verhindern Absturz beim Sektorwechsel.
 
 ## Nächster Schritt
-- Loot-System prüfen: Nutzen die Loot-Items (`js/entities/Loot.js`) auch schon den neuen Scaler?
-- UI Integration: Radar-System an neue Skalierungen anpassen, falls nötig.
+- Testen des Sektorwechsels (Jump Gate), um sicherzustellen, dass Stats korrekt übernommen werden.
 
 ## Aktueller Code-Hash
-- js/core/config.js
-- js/core/SpriteHelper.js
-- js/entities/Ship.js
-- js/entities/EnemyShip.js
-- js/entities/Asteroid.js
+- js/scenes/GameScene.js
