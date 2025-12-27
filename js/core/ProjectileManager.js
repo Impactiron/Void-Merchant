@@ -8,8 +8,11 @@ import { WEAPON_DB } from '../data/WeaponDB.js';
  * MODULE: PROJECTILE MANAGER
  * * Implementiert Object Pooling für Projektile.
  * * UPDATE: Getrennte Gruppen für Player und Enemy Projectiles (Friendly Fire Logic).
- * * FIX: Helper-Methode getGroup hinzugefügt für sicheren Zugriff.
+ * * UPDATE: Auto-Scaling für Projektile integriert.
  */
+
+import { GAME_CONFIG } from './config.js';
+import { enforceSpriteSize } from './SpriteHelper.js'; // NEU
 
 export default class ProjectileManager {
     constructor(scene) {
@@ -26,18 +29,6 @@ export default class ProjectileManager {
             defaultKey: 'spr_proj_laser_red',
             maxSize: 50
         });
-    }
-
-    /**
-     * Gibt die physische Gruppe zurück.
-     * @param {string} type - 'player' oder 'enemy'
-     * @returns {Phaser.Physics.Arcade.Group}
-     */
-    getGroup(type) {
-        if (type === 'player') return this.playerLasers;
-        if (type === 'enemy') return this.enemyLasers;
-        console.warn('ProjectileManager: Unknown group type', type);
-        return null;
     }
 
     /**
@@ -61,16 +52,22 @@ export default class ProjectileManager {
             bullet.setVisible(true);
             bullet.setRotation(rotation);
 
-            // Visuals
+            // 1. VISUALS & SCALING (NEU)
+            // Wir erzwingen die Standardgröße für Projektile (z.B. 16px)
+            // und setzen die Hitbox auf einen Kreis für bessere Kollision bei Rotation.
+            enforceSpriteSize(bullet, GAME_CONFIG.PROJECTILE_SIZE, true);
+
             if (color) {
                 bullet.setTint(color);
             } else {
                 bullet.clearTint();
             }
 
+            // 2. LOGIC
             bullet.damage = damage;
             bullet.isPlayerShot = isPlayerSource; // Tagging für Logik
 
+            // 3. PHYSICS
             this.scene.physics.world.enable(bullet);
             this.scene.physics.velocityFromRotation(rotation, speed, bullet.body.velocity);
 
