@@ -5,34 +5,33 @@
  * MODULE: SHIP ENTITY
  * * Basis-Klasse für steuerbare Schiffe.
  * * UPDATE Phase 2: Refactored to use Components (Health & Cargo).
- * * UPDATE FIX: Added Guard Clause for scene/body existence.
+ * * UPDATE Phase 3: Auto-Scaling via SpriteHelper.
  */
 
 import WeaponSystem from './WeaponSystem.js';
 import { getShipStats } from '../data/ShipDB.js';
 import events from '../core/EventsCenter.js';
-import HealthComponent from '../components/HealthComponent.js'; 
-import CargoComponent from '../components/CargoComponent.js';   
+import HealthComponent from '../components/HealthComponent.js';
+import CargoComponent from '../components/CargoComponent.js';
+import { enforceSpriteSize } from '../core/SpriteHelper.js'; // NEU
 
 export default class Ship extends Phaser.Physics.Arcade.Sprite {
     constructor(scene, x, y, shipId, projectileManager) {
         // 1. LOAD STATS
         const dbStats = getShipStats(shipId);
-        // Fallback für Textur, falls DB undefined liefert
-        const texture = 'spr_ship_terran_fighter'; 
+        const texture = 'spr_ship_terran_fighter'; // Placeholder Textur
 
         super(scene, x, y, texture);
 
         this.scene = scene;
         this.id = shipId; 
         
-        // Instance ID logic
+        // Instance ID Logic
         if (shipId === 'player_ship') { 
              this.instanceId = 'player';
         } else {
              this.instanceId = `ship_${Date.now()}_${Math.random()}`;
         }
-        
         Object.defineProperty(this, 'id', { value: this.instanceId, writable: true });
 
         this.scene.add.existing(this);
@@ -41,23 +40,17 @@ export default class Ship extends Phaser.Physics.Arcade.Sprite {
         // --- IFF IDENTIFICATION ---
         this.faction = dbStats.faction || 'ARG';
 
-        // --- COMPONENTS SETUP (REFACTOR) ---
+        // --- COMPONENTS SETUP ---
         this.meta = {
             name: dbStats.name,
             class: dbStats.class,
             basePrice: dbStats.price
         };
 
-        // 1. Health Component
         this.health = new HealthComponent(this.scene, this, dbStats.hull, dbStats.shield);
-
-        // 2. Cargo Component
         this.cargo = new CargoComponent(this, dbStats.cargo);
-
-        // 3. Credits
         this._credits = 0;
 
-        // --- PROXY FOR CREDITS EVENT ---
         Object.defineProperty(this, 'credits', {
             get: () => this._credits,
             set: (value) => {
@@ -71,16 +64,22 @@ export default class Ship extends Phaser.Physics.Arcade.Sprite {
             configurable: true
         });
 
-        // --- VISUAL SCALING ---
-        let targetSize = 64;
-        if (this.meta.class === 'M') targetSize = 128;
-        if (this.meta.class === 'L') targetSize = 256;
-        if (this.meta.class === 'XL') targetSize = 512;
+        // --- VISUAL SCALING (AUTO-SCALER) ---
+        // Bestimme Zielgröße basierend auf Schiffsklasse
+        let targetSize = 32; // Default S
+        if (this.meta.class === 'M') targetSize = 64;   // Reduziert für bessere Spielbarkeit
+        if (this.meta.class === 'L') targetSize = 128;
+        if (this.meta.class === 'XL') targetSize = 256;
 
-        this.setDisplaySize(targetSize, targetSize);
+        // Nutze den neuen Helper für konsistente Größe & Hitbox
+        enforceSpriteSize(this, targetSize, false); // false = Box Hitbox
+
+        // Hitbox etwas verkleinern für besseres "Game Feel" (80% der visuellen Größe)
         const hitboxSize = targetSize * 0.8;
         this.body.setSize(hitboxSize, hitboxSize);
-        this.body.setOffset((this.width - hitboxSize) / 2, (this.height - hitboxSize) / 2);
+        // Offset zentrieren
+        this.body.setOffset((this.displayWidth - hitboxSize) / 2, (this.displayHeight - hitboxSize) / 2);
+
 
         // --- PHYSICS CONFIGURATION ---
         this.speed = dbStats.speed;
@@ -103,11 +102,7 @@ export default class Ship extends Phaser.Physics.Arcade.Sprite {
     }
 
     takeDamage(amount) {
-        // Safety Check
-        if (!this.scene || !this.active) return;
-        
         this.health.takeDamage(amount);
-        // Visual Shake if Player
         if (this.id === 'player') {
             this.scene.cameras.main.shake(100, 0.005);
         }
@@ -118,33 +113,27 @@ export default class Ship extends Phaser.Physics.Arcade.Sprite {
     }
 
     update(input, time, delta) {
-        // --- GUARD CLAUSE: Preventing Crash ---
-        // Wenn das Objekt zerstört wurde oder die Szene wechselt, brechen wir sofort ab.
-        if (!this.scene || !this.body || !this.active) return;
-        
+        if (!input) return;
+        if (!this.body) return;
         if (this.health.isDead) return;
 
-        // UPDATE COMPONENTS
         this.health.update(time, delta);
         if (this.weaponSystem) this.weaponSystem.update(input, time);
-        if (!input) return; // NPC Schiffe haben ggf. keinen Input, Logik folgt später
 
         // 1. ROTATION
         const aimPos = input.getAimPosition();
-        if (aimPos) {
-            const targetAngle = Phaser.Math.Angle.Between(this.x, this.y, aimPos.x, aimPos.y);
-            let diff = Phaser.Math.Angle.Wrap(targetAngle - this.rotation);
+        const targetAngle = Phaser.Math.Angle.Between(this.x, this.y, aimPos.x, aimPos.y);
+        let diff = Phaser.Math.Angle.Wrap(targetAngle - this.rotation);
 
-            if (Math.abs(diff) < 0.05) {
-                this.setAngularVelocity(0);
-                this.setRotation(targetAngle);
-            } else {
-                this.setAngularVelocity(diff * this.turnSpeed);
-            }
+        if (Math.abs(diff) < 0.05) {
+            this.setAngularVelocity(0);
+            this.setRotation(targetAngle);
+        } else {
+            this.setAngularVelocity(diff * this.turnSpeed);
         }
 
         // 2. BRAKE LOGIC
-        if (input.getBrake && input.getBrake()) {
+        if (input.getBrake()) {
             this.body.setDrag(this.brakeDrag);
             this.setAcceleration(0);
             return;
@@ -154,8 +143,6 @@ export default class Ship extends Phaser.Physics.Arcade.Sprite {
 
         // 3. MOVEMENT
         const moveVec = input.getMoveVector();
-        if (!moveVec) return;
-        
         this.setAcceleration(0);
 
         if (moveVec.y !== 0) {
