@@ -19,7 +19,7 @@ export const WEAPON_DB = {
         range: 1200,
         color: 0xff0000, // Red
         sprite: 'spr_proj_laser_red', // Standard Asset
-        scale: 0.02,      // Standard Größe
+        scale: 1,      // Standard Größe
         price: 2500,
         description: 'Standard fighter weapon. Reliable against shields.'
     },
@@ -116,4 +116,5 @@ export const WEAPON_DB = {
 export function getWeapon(id) {
     return WEAPON_DB[id] || WEAPON_DB['wpn_laser_pulse_s'];
 }
+
 
