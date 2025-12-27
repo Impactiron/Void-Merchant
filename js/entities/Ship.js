@@ -1,123 +1,71 @@
-import HealthComponent from '../components/HealthComponent.js';
-import CargoComponent from '../components/CargoComponent.js';
-import { WeaponSystem } from './WeaponSystem.js';
-import events from '../core/EventsCenter.js';
+import { HealthComponent } from '../components/HealthComponent.js';
+import { CargoComponent } from '../components/CargoComponent.js';
+// KORRIGIERTER IMPORT: Named Import statt Default
+import { WeaponSystem } from './WeaponSystem.js'; 
+import { EventsCenter } from '../core/EventsCenter.js';
 
 export class Ship extends Phaser.Physics.Arcade.Sprite {
-    constructor(scene, x, y, texture, config = {}) {
+    constructor(scene, x, y, texture, shipId = 'shp_fighter_mk1') {
         super(scene, x, y, texture);
 
         this.scene = scene;
-        this.scene.add.existing(this);
-        this.scene.physics.add.existing(this);
+        this.shipId = shipId;
 
         // Physics Setup
-        this.setCollideWorldBounds(true);
-        this.setDrag(config.drag || 100);
-        this.setDamping(true);
-        this.setMaxVelocity(config.maxSpeed || 200);
-
-        // Config Data
-        this.id = config.id || 'player_ship';
-        this.type = 'player';
-        this.category = config.category || 'fighter';
-
-        // Components
-        // WICHTIG: HealthComponent und CargoComponent sind Default Exports
-        this.health = new HealthComponent(this, config.hp || 100, config.shield || 50);
-        this.cargo = new CargoComponent(this, config.cargoSpace || 50);
+        this.scene.add.existing(this);
+        this.scene.physics.add.existing(this);
         
-        // Weapon System (Named Export)
-        this.weapons = new WeaponSystem(this.scene, this);
+        this.setCollideWorldBounds(true);
+        this.setDamping(true);
+        this.setDrag(0.5); // "Drift" Faktor (0.5 = starkes Bremsen, 0.99 = Eis)
+        this.setMaxVelocity(400);
 
-        // Movement State
-        this.targetPosition = null;
-        this.isAutoPiloting = false;
-        this.rotationSpeed = config.rotationSpeed || 3;
+        // Components Init
+        this.health = new HealthComponent(this, 100, 100);
+        this.cargo = new CargoComponent(this, 50);
+        
+        // Waffen-System initialisieren (Referenz übergeben)
+        // Wir benötigen den ProjectileManager aus der Scene. 
+        // Annahme: Scene hat public property `projectileManager`
+        this.weaponSystem = new WeaponSystem(
+            this.scene, 
+            this, 
+            this.scene.projectileManager
+        );
 
-        // Events Init
-        this.setupEvents();
-    }
-
-    setupEvents() {
-        // Global Events Listening
-        // Beispiel: Wenn wir auf Heilung von außen reagieren müssten
-        // events.on('heal-player', this.heal, this);
+        // Input Marker (für Player Logic)
+        this.isPlayer = false;
+        
+        // Debug
+        // console.log(`[Ship] Spawned ${shipId} at ${x}:${y}`);
     }
 
     update(time, delta) {
-        // Update Components
-        if (this.weapons) {
-            this.weapons.update(time, delta);
-        }
+        // Components Updates
+        this.weaponSystem.updateCooling(); // Könnte man auch über Events lösen, aber Update ist sicherer für Frames
+    }
 
-        this.health.regenerate(delta);
+    /**
+     * Wird vom InputManager oder AI Controller aufgerufen
+     */
+    firePrimary(time) {
+        this.weaponSystem.fire(time);
+    }
 
-        // Movement Logic
-        if (this.isAutoPiloting && this.targetPosition) {
-            this.moveToTarget();
+    takeDamage(amount) {
+        const destroyed = this.health.damage(amount);
+        if (destroyed) {
+            this.explode();
         } else {
-            this.handleInput();
-        }
-
-        // UI Updates via EventBus (Performance: Nicht jeden Frame, aber hier der Einfachheit halber)
-        // Besser: Nur bei Änderung emitten. Hier ein Beispiel für Health-Update.
-        // events.emit('ui-update-hull', this.health.currentHP, this.health.maxHP);
-    }
-
-    handleInput() {
-        // Wird vom PlayerController oder GameScene gesteuert, 
-        // hier nur die physikalische Umsetzung, falls Input direkt übergeben wird
-        // (Aktuell steuert die GameScene meist direkt via InputManager die Velocity)
-    }
-
-    moveToTarget() {
-        const distance = Phaser.Math.Distance.Between(this.x, this.y, this.targetPosition.x, this.targetPosition.y);
-        
-        if (distance < 10) {
-            this.body.setVelocity(0);
-            this.isAutoPiloting = false;
-            this.targetPosition = null;
-            events.emit('autopilot-arrived');
-            return;
-        }
-
-        const angle = Phaser.Math.Angle.Between(this.x, this.y, this.targetPosition.x, this.targetPosition.y);
-        this.scene.physics.velocityFromRotation(angle, this.body.maxVelocity.x, this.body.velocity);
-        this.setRotation(angle + Math.PI / 2);
-    }
-
-    setTarget(x, y) {
-        this.targetPosition = new Phaser.Math.Vector2(x, y);
-        this.isAutoPiloting = true;
-    }
-
-    receiveDamage(amount) {
-        const damageTaken = this.health.takeDamage(amount);
-        
-        // Visuelles Feedback
-        this.scene.tweens.add({
-            targets: this,
-            alpha: 0.5,
-            duration: 50,
-            yoyo: true,
-            repeat: 1
-        });
-
-        // Event für UI und GameLogic
-        events.emit('player-damaged', { 
-            currentHP: this.health.currentHP, 
-            maxHP: this.health.maxHP,
-            damage: damageTaken 
-        });
-
-        if (this.health.isDead()) {
-            this.die();
+            // Flash Effect oder ähnliches
+            this.setTint(0xff0000);
+            this.scene.time.delayedCall(100, () => this.clearTint());
         }
     }
 
-    die() {
-        events.emit('player-destroyed', this.x, this.y);
+    explode() {
+        EventsCenter.emit('ship-destroyed', this);
+        // Explosion FX (TODO)
         this.destroy();
     }
 }
