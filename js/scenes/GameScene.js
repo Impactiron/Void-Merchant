@@ -1,175 +1,459 @@
-import Player from '../entities/Ship.js'; // Angenommen Ship.js ist der Player
-import Asteroid from '../entities/Asteroid.js';
-import Loot from '../entities/Loot.js'; // WICHTIG: Default Import
-import { CONFIG } from '../core/config.js';
-import EventsCenter from '../core/EventsCenter.js';
-import FXManager from '../core/FXManager.js';
-import ProjectileManager from '../core/ProjectileManager.js';
-import InputManager from '../core/InputManager.js';
+// FILE: js/scenes/GameScene.js
 
 /**
- * @class GameScene
- * @extends Phaser.Scene
- * Die Hauptszene des Spiels (In-Sector View).
+ * 📘 PROJECT: VOID MERCHANT
+ * SCENE: GAME SCENE (Active Sector)
+ * * UPDATE Phase 2.1: Integrated SectorThreatManager & Mining Events
+ * * UPDATE Fix: Projectile Accessor Pattern implementation
  */
+
+import InputManager from '../core/InputManager.js';
+import Ship from '../entities/Ship.js';
+import ProjectileManager from '../core/ProjectileManager.js';
+import FXManager from '../core/FXManager.js';
+import Loot from '../entities/Loot.js';
+import SaveSystem from '../core/SaveSystem.js';
+import AudioManager from '../core/AudioManager.js';
+import MissionManager from '../core/MissionManager.js';
+import SectorManager from '../core/SectorManager.js';
+import SectorThreatManager from '../core/SectorThreatManager.js';
+import { CONFIG } from '../core/config.js';
+import StationMenu from '../ui/StationMenu.js';
+import events from '../core/EventsCenter.js';
+
 export default class GameScene extends Phaser.Scene {
     constructor() {
         super({ key: 'GameScene' });
+        this.npcMap = new Map();
+    }
+
+    init(data) {
+        this.currentSectorId = data.targetSector || 'sec_argon_prime';
+        this.entryGateId = data.entryGate || null;
+        this.transferPlayerData = data.playerData || null;
+        this.npcMap.clear();
+    }
+
+    preload() {
+        if (!this.textures.exists('spr_npc_trader')) {
+            const gr = this.make.graphics({ x: 0, y: 0, add: false });
+            gr.fillStyle(0xffcc00, 1);
+            gr.fillRect(0, 0, 24, 24);
+            gr.generateTexture('spr_npc_trader', 24, 24);
+        }
+        // Fallback texture for Kha'ak if not present
+        if (!this.textures.exists('khk_s_fighter_queen_guard')) {
+             const gr = this.make.graphics({ x: 0, y: 0, add: false });
+             gr.fillStyle(0xff00ff, 1); // Purple
+             gr.fillTriangle(0, 0, 20, 10, 0, 20); // Spike shape
+             gr.generateTexture('khk_s_fighter_queen_guard', 20, 20);
+        }
     }
 
     create() {
-        // 1. Welt & Physik
-        this.physics.world.setBounds(0, 0, 4000, 4000); // Beispielgröße Sektor
-        
-        // Hintergrund (Tiling Sprite für Performance)
-        this.add.tileSprite(0, 0, 4000, 4000, 'bg_stars').setOrigin(0).setScrollFactor(0.5);
+        console.log("GameScene: Active.");
 
-        // 2. Core Systeme Initialisieren
-        this.fxManager = new FXManager(this);
+        // --- MANAGERS ---
+        this.sectorManager = new SectorManager(this);
+        this.audioManager = new AudioManager(this);
         this.projectileManager = new ProjectileManager(this);
+        this.fxManager = new FXManager(this);
+        this.saveSystem = new SaveSystem();
         this.inputManager = new InputManager(this);
+        this.stationMenu = new StationMenu(this);
         
-        // 3. Gruppen erstellen
-        this.asteroids = this.physics.add.group({
-            classType: Asteroid,
-            runChildUpdate: true
-        });
-        
-        this.lootGroup = this.physics.add.group({
-            classType: Loot,
-            runChildUpdate: true
-        });
-        
-        this.enemies = this.physics.add.group({
-            runChildUpdate: true
-        });
+        // NEU: Hive Mind Integration
+        this.threatManager = new SectorThreatManager(this);
 
-        // 4. Player Spawnen
-        // Wir zentrieren den Spieler in der Welt
-        this.player = new Player(this, 2000, 2000, 'spr_ship_player', true);
-        
-        // Kamera folgt Spieler
-        this.cameras.main.startFollow(this.player);
-        this.cameras.main.setBounds(0, 0, 4000, 4000);
-        this.cameras.main.setZoom(1);
+        if (!window.game.missionManager) {
+            window.game.missionManager = new MissionManager(this);
+        }
+        this.missionManager = window.game.missionManager;
 
-        // 5. Test-Inhalte Spawnen (Asteroidenfeld)
-        this.spawnTestAsteroids(20);
+        // --- GROUPS ---
+        this.asteroids = this.add.group({ runChildUpdate: false });
+        this.lootGroup = this.add.group({ runChildUpdate: true });
+        this.enemies = this.add.group({ runChildUpdate: true });
+        this.gates = this.add.group({ runChildUpdate: false });
+        this.stations = this.add.group({ runChildUpdate: false });
 
-        // 6. Kollisionen
-        this.setupCollisions();
+        // --- LOAD SECTOR ---
+        this.sectorManager.loadSector(this.currentSectorId);
 
-        // 7. Input Events
-        this.inputManager.setupInput(this.player);
+        // --- PLAYER SETUP ---
+        this.createPlayer();
 
-        // UI Overlay starten
+        // --- CAMERA ---
+        this.cameras.main.startFollow(this.player, true, 0.09, 0.09);
+        this.cameras.main.setZoom(1.0);
+
+        // --- UI LAUNCH ---
         this.scene.launch('UIScene');
-        this.scene.moveUp('UIScene');
+
+        // --- STATE FLAGS ---
+        this.isDocked = false;
+        this.isJumping = false;
+        this.isGameOver = false;
+
+        // --- NPC SYNC ---
+        this.time.addEvent({
+            delay: 100,
+            callback: this.syncNPCs,
+            callbackScope: this,
+            loop: true
+        });
+
+        // --- COLLISIONS ---
+        this.setupCollisions();
     }
 
-    update(time, delta) {
-        if (this.player) {
-            this.player.update(time, delta);
+    createPlayer() {
+        let spawnX = 0;
+        let spawnY = 0;
+
+        if (this.entryGateId) {
+            const gate = this.gates.getChildren().find(g => g.id === this.entryGateId);
+            if (gate) {
+                spawnX = gate.x;
+                spawnY = gate.y + 300;
+            }
         }
+
+        let dbId = 'arg_s_fighter_elite';
         
-        // Projektile updaten
-        this.projectileManager.update(time, delta);
-    }
-
-    /**
-     * Erstellt zufällige Asteroiden
-     */
-    spawnTestAsteroids(count) {
-        for (let i = 0; i < count; i++) {
-            const x = Phaser.Math.Between(100, 3900);
-            const y = Phaser.Math.Between(100, 3900);
-            
-            // Zufällige Größe
-            const rand = Math.random();
-            let size = 'medium';
-            if (rand < 0.2) size = 'small';
-            if (rand > 0.8) size = 'large';
-
-            // Factory-Pattern via Group wäre auch möglich, aber new Asteroid geht dank Scene-Referenz auch
-            // WICHTIG: Da Asteroid 'scene.add.existing' ruft, müssen wir es nicht manuell adden, 
-            // aber für die Gruppe ist es sauberer:
-            const asteroid = new Asteroid(this, x, y, size);
-            this.asteroids.add(asteroid);
+        // Load Logic...
+        let savedData = null;
+        if (!this.transferPlayerData) {
+            savedData = this.saveSystem.load();
+            if (savedData && savedData.player && savedData.player.currentShipId) {
+                dbId = savedData.player.currentShipId;
+            }
+        } else if (this.transferPlayerData.shipId) {
+            dbId = this.transferPlayerData.shipId;
         }
-    }
 
-    /**
-     * Zentralisierte Methode zum Spawnen von Loot.
-     * Wird von Asteroiden und Feinden aufgerufen.
-     * @param {number} x 
-     * @param {number} y 
-     * @param {string} wareId 
-     * @param {number} amount 
-     */
-    spawnLoot(x, y, wareId, amount) {
-        // Streuung, damit Loot nicht exakt übereinander liegt
-        const scatter = 30; 
-        
-        for (let i = 0; i < amount; i++) {
-            const spawnX = x + Phaser.Math.Between(-scatter, scatter);
-            const spawnY = y + Phaser.Math.Between(-scatter, scatter);
+        this.player = new Ship(this, spawnX, spawnY, dbId, this.projectileManager);
+        this.player.id = 'player';
+        this.player.faction = 'PLAYER';
+
+        // RESTORE STATE
+        if (this.transferPlayerData) {
+            this.player.health.setData(this.transferPlayerData.stats.hullCurrent, this.transferPlayerData.stats.shieldCurrent);
+            this.player.cargo.items = this.transferPlayerData.cargo.items || {};
+            if (this.transferPlayerData.weaponId) this.player.weaponSystem.equip(this.transferPlayerData.weaponId);
+        } else if (savedData) {
+            this.player.credits = savedData.player.credits;
             
-            // Da Loot Default Export ist, instanziieren wir es direkt
-            // Loot(scene, x, y, type, amount) -> Konstruktor Signatur prüfen!
-            // Angenommen Loot droppt 1 Unit pro Instanz, oder Instanz hält 'amount'.
-            // Hier gehen wir davon aus: 1 Loot-Objekt kann 'amount' Einheiten enthalten.
-            // Falls wir pro Einheit ein Icon wollen, müssten wir loop nutzen.
-            
-            // Wir spawnen EINEN Container mit der Menge 'amount', oder splitten es?
-            // Einfachheitshalber: Ein Loot-Objekt enthält den gesamten Amount.
-            const loot = new Loot(this, spawnX, spawnY, wareId, 1); // Oder 'amount' wenn Loot-Klasse das unterstützt
-            // Falls das Loot-Objekt 'amount' unterstützt, ändere die 1 zu 'amount'.
-            // Da ich Loot.js nicht sehe, gehe ich vom Standard "1 Item pro Drop" Visual aus,
-            // aber logisch aggregieren wir es im Inventar.
-            // HIER: Rufe 'amount' mal auf 1, damit wir viele kleine Teile sehen (Spaßfaktor),
-            // ODER nur ein Teil. Ich mache mal Loop-Logik oben weg und übergebe amount direkt:
-            
-            // KORREKTUR: Um Syntax-Fehler zu vermeiden, erstelle ich EIN Objekt mit Amount.
-            // new Loot(this, spawnX, spawnY, wareId, amount); 
-            // Falls Loot.js amount im Constructor annimmt. Falls nicht, setzen wir es manuell.
-            
-            loot.amount = 1; // Fallback
-            this.lootGroup.add(loot);
+            if (savedData.player.hullCurrent !== undefined) {
+                this.player.health.setData(savedData.player.hullCurrent, savedData.player.shieldCurrent);
+            }
+            if (savedData.player.cargo) this.player.cargo.items = savedData.player.cargo;
+            if (savedData.ship && savedData.ship.activeWeaponId) this.player.weaponSystem.equip(savedData.ship.activeWeaponId);
+            if (savedData.missions) this.missionManager.importMissions(savedData.missions);
         }
     }
 
     setupCollisions() {
-        // Player vs Asteroids
+        // --- PHYSICAL COLLISIONS ---
         this.physics.add.collider(this.player, this.asteroids);
-        
-        // Projectiles vs Asteroids
-        this.physics.add.overlap(this.projectileManager.getGroup(), this.asteroids, (projectile, asteroid) => {
-            if (projectile.active && asteroid.active) {
-                asteroid.takeDamage(projectile.damage);
-                projectile.destroy(); // Projektil weg
-                
-                // Hit FX
-                this.fxManager.playHitEffect(projectile.x, projectile.y);
-            }
-        });
+        this.physics.add.collider(this.player, this.stations);
+        this.physics.add.collider(this.asteroids, this.asteroids);
+        this.physics.add.collider(this.enemies, this.asteroids);
+        this.physics.add.collider(this.enemies, this.enemies);
+        this.physics.add.collider(this.player, this.enemies);
 
-        // Player vs Loot (Pickup)
-        this.physics.add.overlap(this.player, this.lootGroup, (player, loot) => {
-            if (loot.active) {
-                // Logik zum Aufsammeln
-                const cargo = player.getComponent('CargoComponent');
-                if (cargo) {
-                    const leftover = cargo.addCargo(loot.wareId, loot.amount || 1);
-                    if (leftover === 0) {
-                        // Alles aufgenommen
-                        EventsCenter.emit('ui-message', `Collected: ${loot.wareId}`);
-                        loot.destroy();
-                    } else {
-                        // Inventar voll
-                        EventsCenter.emit('ui-message', `Inventory Full!`);
-                    }
+        // --- PROJECTILE COLLISIONS (Using getGroup Accessor) ---
+        
+        // Player shoots Enemies & Asteroids
+        this.physics.add.overlap(
+            this.projectileManager.getGroup('player'), 
+            this.enemies, 
+            this.handleLaserHitEnemy, 
+            null, 
+            this
+        );
+        this.physics.add.overlap(
+            this.projectileManager.getGroup('player'), 
+            this.asteroids, 
+            this.handleLaserHitAsteroid, 
+            null, 
+            this
+        );
+        this.physics.add.overlap(
+            this.projectileManager.getGroup('player'),
+            this.stations,
+            (st, l) => this.projectileManager.killBullet(l)
+        );
+
+        // Enemies shoot Player & Asteroids
+        this.physics.add.overlap(
+            this.projectileManager.getGroup('enemy'), 
+            this.player, 
+            this.handleLaserHitPlayer, 
+            null, 
+            this
+        );
+        this.physics.add.overlap(
+            this.projectileManager.getGroup('enemy'), 
+            this.asteroids, 
+            this.handleLaserHitAsteroid, 
+            null, 
+            this
+        );
+        this.physics.add.overlap(
+            this.projectileManager.getGroup('enemy'),
+            this.stations,
+            (st, l) => this.projectileManager.killBullet(l)
+        );
+
+        // Loot Pickup
+        this.physics.add.overlap(this.player, this.lootGroup, this.handleLootCollection, null, this);
+    }
+
+    update(time, delta) {
+        this.inputManager.update();
+        this.updateNPCSprites();
+
+        if (this.isGameOver) {
+            if (this.inputManager.getFire()) window.location.reload();
+            return;
+        }
+
+        // NEU: Update Threat Logic (Decay & Spawn checks)
+        if (this.threatManager) this.threatManager.update(time, delta);
+
+        if (this.isDocked || this.isJumping) return;
+
+        // UI Toggles
+        if (this.inputManager.getMapToggle()) {
+            this.audioManager.playSfx('sfx_ui_select');
+            this.scene.pause('GameScene');
+            this.scene.pause('UIScene');
+            this.scene.launch('MapScene');
+            return;
+        }
+
+        if (this.inputManager.getBuildToggle()) {
+            this.audioManager.playSfx('sfx_ui_select');
+            this.scene.pause('GameScene');
+            this.scene.pause('UIScene');
+            this.scene.launch('BuilderScene');
+            return;
+        }
+
+        // Updates
+        if (this.projectileManager) this.projectileManager.update(time, delta);
+        if (this.player && this.player.active) this.player.update(this.inputManager, time, delta);
+
+        this.sectorManager.handlePopulation(time);
+
+        // Gate Proximity
+        this.gates.children.iterate(gate => {
+            if (gate.active && !this.isJumping) {
+                const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, gate.x, gate.y);
+                if (dist < 100) {
+                    this.sectorManager.handleGateJump(this.player, gate);
                 }
             }
         });
+
+        this.handleDockingProximity();
+
+        this.bg.tilePositionX = this.cameras.main.scrollX * 0.5;
+        this.bg.tilePositionY = this.cameras.main.scrollY * 0.5;
+    }
+
+    updateNPCSprites() {
+        this.npcMap.forEach((sprite, id) => {
+            if (sprite.targetX !== undefined && sprite.targetY !== undefined) {
+                sprite.x = Phaser.Math.Linear(sprite.x, sprite.targetX, 0.05);
+                sprite.y = Phaser.Math.Linear(sprite.y, sprite.targetY, 0.05);
+                // Rotate visual
+            }
+        });
+    }
+
+    handleDockingProximity() {
+        let nearestStation = null;
+        let minDist = Infinity;
+        this.stations.children.iterate(station => {
+            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, station.x, station.y);
+            if (dist < minDist) {
+                minDist = dist;
+                nearestStation = station;
+            }
+        });
+
+        const uiScene = this.scene.get('UIScene');
+        if (nearestStation && minDist < nearestStation.dockingRange) {
+            this.currentStation = nearestStation;
+            if (uiScene && uiScene.setDockingAvailable) {
+                uiScene.setDockingAvailable(true, nearestStation.name);
+            }
+            if (this.inputManager.getInteract()) {
+                this.audioManager.playSfx('sfx_ui_select');
+                this.openStationMenu();
+            }
+        } else {
+            this.currentStation = null;
+            if (uiScene && uiScene.setDockingAvailable) {
+                uiScene.setDockingAvailable(false);
+            }
+        }
+    }
+
+    syncNPCs() {
+        if (!window.game || !window.game.universe) return;
+        const agentsInSector = window.game.universe.getAgentsInSector(this.currentSectorId);
+        const currentFrameIds = new Set();
+        agentsInSector.forEach(agent => {
+            currentFrameIds.add(agent.id);
+            if (this.npcMap.has(agent.id)) {
+                const sprite = this.npcMap.get(agent.id);
+                sprite.targetX = agent.x;
+                sprite.targetY = agent.y;
+            } else {
+                this.spawnNPC(agent);
+            }
+        });
+        this.npcMap.forEach((sprite, id) => {
+            if (!currentFrameIds.has(id)) this.despawnNPC(id);
+        });
+    }
+
+    spawnNPC(agent) {
+        // Fallback or specific texture logic
+        let texture = 'spr_npc_trader';
+        if (agent.id.includes('khk') || (agent.faction && agent.faction === 'KHAAK')) {
+            texture = 'khk_s_fighter_queen_guard';
+        }
+
+        const sprite = this.add.sprite(agent.x, agent.y, texture);
+        sprite.setDisplaySize(64, 64);
+        sprite.targetX = agent.x;
+        sprite.targetY = agent.y;
+        this.npcMap.set(agent.id, sprite);
+    }
+
+    despawnNPC(id) {
+        const sprite = this.npcMap.get(id);
+        if (sprite) {
+            sprite.destroy();
+            this.npcMap.delete(id);
+        }
+    }
+
+    handleLaserHitEnemy(laser, enemy) {
+        if (!laser.active || !enemy.active) return;
+        const dmg = laser.damage || 10;
+        this.fxManager.showFloatingText(enemy.x, enemy.y - 20, Math.floor(dmg), '#ffaa00');
+        this.audioManager.playSfx('sfx_impact_hull', { volume: 0.3 });
+        
+        if (typeof enemy.takeDamage === 'function') {
+            enemy.takeDamage(dmg);
+        } else {
+            enemy.destroy();
+        }
+        this.projectileManager.killBullet(laser);
+    }
+
+    handleLaserHitPlayer(player, laser) {
+        if (!laser.active || !player.active || this.isGameOver) return;
+        
+        const dmg = laser.damage || 10;
+        this.fxManager.showFloatingText(player.x, player.y - 20, Math.floor(dmg), '#ff3333');
+        this.audioManager.playSfx('sfx_impact_hull');
+
+        const uiScene = this.scene.get('UIScene');
+        if (uiScene && uiScene.triggerDamageFlash) uiScene.triggerDamageFlash();
+
+        player.takeDamage(dmg);
+        this.projectileManager.killBullet(laser);
+
+        if (player.health.isDead) this.handlePlayerDeath();
+    }
+
+    handlePlayerDeath() {
+        this.isGameOver = true;
+        this.fxManager.playExplosion(this.player.x, this.player.y, 2.0);
+        this.player.setActive(false);
+        this.player.setVisible(false);
+        this.player.body.stop();
+        // UI Scene handles 'entity-died' event
+    }
+
+    handleLaserHitAsteroid(obj1, obj2) {
+        let laser = (obj1.texture && obj1.texture.key.includes('laser')) ? obj1 : obj2;
+        let asteroid = (obj1 === laser) ? obj2 : obj1;
+        if (!laser || !asteroid || !laser.active || !asteroid.active) return;
+        const dmg = laser.damage || 10;
+        this.fxManager.showFloatingText(asteroid.x, asteroid.y, Math.floor(dmg), '#aaaaaa');
+        this.audioManager.playSfx('sfx_impact_hull', { volume: 0.2 });
+        if (typeof asteroid.takeDamage === 'function') asteroid.takeDamage(dmg);
+        this.projectileManager.killBullet(laser);
+    }
+
+    handleLootCollection(player, lootItem) {
+        if (!lootItem.active) return;
+        this.audioManager.playSfx('sfx_ui_select', { volume: 0.5 });
+        
+        const success = player.cargo.add(lootItem.wareId, lootItem.amount);
+        
+        const uiScene = this.scene.get('UIScene');
+        if (success) {
+            if (uiScene && uiScene.showLootNotification) {
+                uiScene.showLootNotification(lootItem.wareId.toUpperCase(), lootItem.amount);
+            }
+            lootItem.destroy();
+        } else {
+            if (uiScene && uiScene.showLootNotification) {
+                uiScene.showLootNotification('CARGO FULL', '0');
+            }
+        }
+    }
+
+    saveGameData() {
+        if (!this.player || this.isGameOver) return;
+        const shipData = { activeWeaponId: this.player.weaponSystem.activeWeaponId };
+        
+        const extendedPlayerData = {
+            credits: this.player.credits,
+            cargo: this.player.cargo.items,
+            currentShipId: 'arg_s_fighter_elite', 
+            hullCurrent: this.player.health.currentHp,
+            shieldCurrent: this.player.health.currentShield,
+            hullMax: this.player.health.maxHp, 
+            shieldMax: this.player.health.maxShield
+        };
+        const missionData = this.missionManager ? this.missionManager.exportMissions() : [];
+        this.saveSystem.save(extendedPlayerData, shipData, missionData);
+    }
+
+    openStationMenu() {
+        if (!this.currentStation) return;
+        this.isDocked = true;
+        this.player.body.stop();
+        this.player.body.setImmovable(true);
+        this.stationMenu.open(this.currentStation);
+    }
+
+    handleUndock() {
+        this.isDocked = false;
+        this.player.body.setImmovable(false);
+        const angle = Phaser.Math.Angle.Between(this.currentStation.x, this.currentStation.y, this.player.x, this.player.y);
+        this.physics.velocityFromRotation(angle, 200, this.player.body.velocity);
+    }
+
+    spawnLoot(x, y, wareId, amount) {
+        const loot = new Loot(this, x, y, wareId, amount);
+        this.lootGroup.add(loot);
+        const angle = Phaser.Math.Between(0, 360);
+        const speed = Phaser.Math.Between(50, 150);
+        this.physics.velocityFromAngle(angle, speed, loot.body.velocity);
+
+        // NEU: Global Event for Threat Manager
+        if (this.events) {
+            this.events.emit('mining-complete', { sector: this.currentSectorId, amount: amount });
+        }
     }
 }
