@@ -1,13 +1,7 @@
-// FILE: js/core/EventsCenter.js
+// J.A.R.V.I.S. Protocol: Global Event Emitter
+// Switch to Named Export to ensure singleton consistency
 
-/**
- * 📘 PROJECT: VOID MERCHANT
- * MODULE: EVENTS CENTER
- * * Zentraler Event-Bus für die Kommunikation zwischen losgelösten Systemen.
- * * Singleton Pattern.
- */
+// Wir gehen davon aus, dass Phaser global via index.html geladen wird.
+// Falls nicht, müsste hier: import Phaser from 'phaser'; stehen.
 
-const events = new Phaser.Events.EventEmitter();
-
-export default events;
-
+export const EventsCenter = new Phaser.Events.EventEmitter();
