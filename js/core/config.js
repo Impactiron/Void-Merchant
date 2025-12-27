@@ -38,7 +38,7 @@ export const CONSTANTS = {
     // Global Layers
     DEPTH: {
         BACKGROUND: 0,
-        GATES: 15, // NEU
+        GATES: 15,
         STATIONS: 10,
         SHIPS: 20,
         FX: 30,
@@ -57,5 +57,6 @@ export const CONSTANTS = {
 };
 
 export const GAME_CONFIG = {
-    SPRITE_SIZE: 32 // Standardgröße in Pixeln für Schiffe/Objekte
+    SPRITE_SIZE: 32,      // Standardgröße für Schiffe
+    PROJECTILE_SIZE: 16   // NEU: Standardgröße für Projektile
 };
