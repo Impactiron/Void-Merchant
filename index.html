@@ -2,68 +2,126 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Void Merchant</title>
     <link rel="stylesheet" href="css/style.css">
-    
-    <!-- Phaser 3.80+ via CDN -->
+
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 </head>
 <body>
-    <div id="game-container"></div>
-    <div id="ui-layer"></div>
 
-    <!-- CORE MODULES -->
-    <script type="module" src="js/core/config.js"></script>
-    <script type="module" src="js/core/EventsCenter.js"></script>
-    <script type="module" src="js/core/InputManager.js"></script>
-    <script type="module" src="js/core/AudioManager.js"></script>
-    <script type="module" src="js/core/FXManager.js"></script>
-    <script type="module" src="js/core/SaveSystem.js"></script>
-    <script type="module" src="js/core/UniverseSim.js"></script>
-    <script type="module" src="js/core/SectorManager.js"></script>
-    <script type="module" src="js/core/SectorThreatManager.js"></script>
-    <script type="module" src="js/core/ProjectileManager.js"></script>
-    <script type="module" src="js/core/MissionManager.js"></script>
-    <script type="module" src="js/core/PoliticsManager.js"></script>
-    <!-- FIX: Typo corrected from CraftingManage.js to CraftingManager.js -->
-    <script type="module" src="js/core/CraftingManager.js"></script> 
+<div id="game-container"></div>
 
-    <!-- DATA DATABASES -->
-    <script type="module" src="js/data/WareDB.js"></script>
-    <script type="module" src="js/data/ShipDB.js"></script>
-    <script type="module" src="js/data/ModuleDB.js"></script>
-    <script type="module" src="js/data/WeaponDB.js"></script>
-    <script type="module" src="js/data/SectorDB.js"></script>
-    <script type="module" src="js/data/StationDB.js"></script>
-    <script type="module" src="js/data/FactionDB.js"></script>
+<div id="ui-layer">
 
-    <!-- ENTITIES & COMPONENTS -->
-    <script type="module" src="js/components/HealthComponent.js"></script>
-    <script type="module" src="js/components/CargoComponent.js"></script>
-    <script type="module" src="js/components/BeamComponent.js"></script>
-    
-    <script type="module" src="js/entities/Ship.js"></script>
-    <script type="module" src="js/entities/EnemyShip.js"></script>
-    <script type="module" src="js/entities/TradeAgent.js"></script>
-    <script type="module" src="js/entities/Station.js"></script>
-    <script type="module" src="js/entities/Gate.js"></script>
-    <script type="module" src="js/entities/Asteroid.js"></script>
-    <script type="module" src="js/entities/Loot.js"></script>
-    <script type="module" src="js/entities/WeaponSystem.js"></script>
+    <div id="main-menu" class="hidden">
+        <div class="menu-content">
+            <h1 class="game-title">VOID MERCHANT</h1>
+            <div class="version-tag">VERSION 0.7.1 (HIVE INTEGRATION)</div>
 
-    <!-- UI -->
-    <script type="module" src="js/ui/StationMenu.js"></script>
+            <div class="menu-buttons">
+                <button id="btn-continue" class="menu-btn large">CONTINUE</button>
+                <button id="btn-newgame" class="menu-btn large">NEW GAME</button>
+                <div class="spacer-small"></div>
+                <button id="btn-clearsave" class="menu-btn danger small">WIPE SAVE DATA</button>
+            </div>
+        </div>
+        <div class="credits">SYSTEMS ONLINE // J.A.R.V.I.S. PROTOCOL</div>
+    </div>
 
-    <!-- SCENES -->
-    <script type="module" src="js/scenes/BootScene.js"></script>
-    <script type="module" src="js/scenes/MenuScene.js"></script>
-    <script type="module" src="js/scenes/MapScene.js"></script>
-    <script type="module" src="js/scenes/UIScene.js"></script>
-    <script type="module" src="js/scenes/GameScene.js"></script>
-    <script type="module" src="js/scenes/BuilderScene.js"></script>
+    <div id="station-menu" class="hidden">
+        <div class="station-header">
+            <h2 id="station-name">UNKNOWN STATION</h2>
+            <div class="station-faction">TERRAN FEDERATION</div>
+        </div>
 
-    <!-- ENTRY POINT -->
-    <script type="module" src="js/core/GameLoop.js"></script>
+        <div class="station-body">
+            <div class="col-nav">
+                <button id="nav-market" class="nav-btn active">MARKET</button>
+                <button id="nav-shipyard" class="nav-btn">SHIPYARD</button>
+                <button id="nav-missions" class="nav-btn">MISSIONS</button>
+                <button class="nav-btn" disabled>HANGAR (Locked)</button>
+                <div class="spacer"></div>
+                <button id="btn-undock" class="nav-btn danger">UNDOCK</button>
+            </div>
+
+            <div class="col-content">
+                <div class="market-header">
+                    <span>ITEM / MISSION</span>
+                    <span>STOCK / REWARD</span>
+                    <span>PRICE / URGENCY</span>
+                </div>
+
+                <div id="market-list" class="market-list"></div>
+                <div id="shipyard-list" class="market-list hidden"></div>
+                <div id="mission-list" class="market-list hidden"></div>
+            </div>
+
+            <div class="col-detail">
+                <h3 id="detail-name">SELECT ITEM</h3>
+                <div id="detail-info" class="detail-box">
+                    <p>Select an item from the list to view details and trade.</p>
+                </div>
+
+                <div id="trade-controls" class="hidden">
+                    <div class="trade-slider-container">
+                        <input type="range" id="trade-slider" min="0" max="100" value="0">
+                        <span id="trade-amount">0</span>
+                    </div>
+                    <div class="trade-actions">
+                        <button id="btn-buy" class="trade-btn buy">BUY</button>
+                        <button id="btn-sell" class="trade-btn sell">SELL</button>
+                    </div>
+                    <div id="trade-total">TOTAL: 0 CR</div>
+                </div>
+
+                <div id="equip-controls" class="hidden">
+                    <div class="trade-actions">
+                        <button id="btn-equip-buy" class="trade-btn buy">BUY & EQUIP</button>
+                    </div>
+                    <div id="equip-price">PRICE: 0 CR</div>
+                </div>
+
+                <div id="mission-controls" class="hidden">
+                    <div class="trade-actions">
+                        <button id="btn-accept-mission" class="trade-btn buy">ACCEPT OFFER</button>
+                    </div>
+                    <div id="mission-reward">REWARD: 0 CR</div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="station-footer">
+            <span id="player-credits">CREDITS: 0</span>
+            <span id="player-cargo">CARGO: 0 / 100</span>
+        </div>
+    </div>
+
+</div>
+
+<!-- DATA MODULES -->
+<script type="module" src="js/data/WareDB.js"></script>
+<script type="module" src="js/data/WeaponDB.js"></script>
+<script type="module" src="js/data/ShipDB.js"></script>
+<script type="module" src="js/data/SectorDB.js"></script>
+<script type="module" src="js/data/ModuleDB.js"></script>
+
+<!-- ENTITIES -->
+<script type="module" src="js/entities/TradeAgent.js"></script>
+
+<!-- COMPONENTS -->
+<script type="module" src="js/components/BeamComponent.js"></script>
+
+<!-- CORE SYSTEMS -->
+<script type="module" src="js/core/EventsCenter.js"></script>
+<script type="module" src="js/core/SectorManager.js"></script>
+<script type="module" src="js/core/SectorThreatManager.js"></script>
+<script type="module" src="js/core/UniverseSim.js"></script>
+<script type="module" src="js/core/MissionManager.js"></script>
+<script type="module" src="js/core/GameLoop.js"></script>
+
 </body>
 </html>
+
+
