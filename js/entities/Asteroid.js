@@ -1,82 +1,88 @@
+// FILE: js/entities/Asteroid.js
+
 /**
- * @class Asteroid
- * @extends Phaser.Physics.Arcade.Sprite
- * * Repräsentiert einen abbaubaren Asteroiden.
- * ÄNDERUNG: Import von Loot entfernt, Delegation an Scene.
+ * 📘 PROJECT: VOID MERCHANT
+ * MODULE: ASTEROID ENTITY
+ * * Zerstörbares Umgebungsobjekt.
+ * * UPDATE: Trigger Loot Drop on Destroy
+ * * UPDATE FIX: Added Guard Clause and Scene Check
  */
+
 export default class Asteroid extends Phaser.Physics.Arcade.Sprite {
-    /**
-     * @param {Phaser.Scene} scene 
-     * @param {number} x 
-     * @param {number} y 
-     * @param {string} size 'small', 'medium', 'large'
-     */
     constructor(scene, x, y, size = 'medium') {
-        // Wir nutzen hier ein generisches Asteroiden-Sprite. 
-        // Falls Assets fehlen, nutzt Phaser oft ein Platzhalter-Rechteck, wenn der Key nicht existiert.
         super(scene, x, y, 'spr_asteroid_iron');
-        
+
         this.scene = scene;
         this.scene.add.existing(this);
         this.scene.physics.add.existing(this);
-        
+
         this.sizeCategory = size;
+        this.hp = 0;
+        this.maxHp = 0;
+        this.mass = 5000;
+
+        // --- AUTO-SCALING & STATS ---
         this.configureStats(size);
-        
-        // Physics Setup
-        // Zufällige Bewegung und Rotation für mehr Dynamik im All
-        this.body.setVelocity(Phaser.Math.Between(-20, 20), Phaser.Math.Between(-20, 20));
+
+        // --- PHYSICS ---
+        this.body.setVelocity(
+            Phaser.Math.Between(-20, 20),
+            Phaser.Math.Between(-20, 20)
+        );
         this.body.setAngularVelocity(Phaser.Math.Between(-10, 10));
-        this.body.setBounce(0.2); // Leichter Abprall
-        this.body.setDrag(10);    // Etwas Reibung im "Vakuum" (Gameplay > Realismus)
+        this.body.setBounce(0.2);
+        this.body.setDrag(0);
+        this.body.setImmovable(false);
     }
 
-    /**
-     * Konfiguriert HP, Masse und Größe basierend auf der Kategorie.
-     * @param {string} size 
-     */
     configureStats(size) {
         let targetDiameter = 64; 
-        
+
         switch (size) {
-            case 'small': 
-                targetDiameter = 32; 
-                this.hp = 100; 
-                this.mass = 1000; 
+            case 'small':
+                targetDiameter = 32;
+                this.hp = 100;
+                this.mass = 1000;
                 break;
-            case 'large': 
-                targetDiameter = 128; 
-                this.hp = 800; 
-                this.mass = 10000; 
+            case 'large':
+                targetDiameter = 128;
+                this.hp = 800;
+                this.mass = 10000;
                 break;
-            default: // medium
-                targetDiameter = 64; 
-                this.hp = 300; 
-                this.mass = 5000; 
+            case 'medium':
+            default:
+                targetDiameter = 64;
+                this.hp = 300;
+                this.mass = 5000;
                 break;
         }
 
-        // Skaliere das Sprite (angenommen das Original ist ca. 64-128px)
-        // Wir setzen hier die DisplaySize fix, um Konsistenz zu wahren.
+        // VISUAL SCALING
         this.setDisplaySize(targetDiameter, targetDiameter);
-        
-        // Hitbox anpassen (etwas kleiner als das Bild für faires Gefühl)
-        const hitboxRadius = (this.displayWidth / 2) * 0.85;
-        this.body.setCircle(hitboxRadius);
-        // Zentrieren des Offsets ist bei setCircle manchmal tricky, oft reicht der Radius wenn Origin 0.5,0.5 ist
-        
+
+        // HITBOX SCALING
+        const hitboxRadius = (this.width / 2) * 0.85;
+        const offset = (this.width - (hitboxRadius * 2)) / 2;
+        this.body.setCircle(hitboxRadius, offset, offset);
         this.body.setMass(this.mass);
+
         this.maxHp = this.hp;
     }
 
-    /**
-     * Verarbeitet Schaden.
-     * @param {number} amount 
-     */
-    takeDamage(amount) {
-        this.hp -= amount;
+    update() {
+        // --- GUARD CLAUSE ---
+        // Verhindert Crash, falls Objekt noch in Update-Liste, aber schon zerstört
+        if (!this.scene || !this.body || !this.active) return;
         
-        // Visuelles Feedback: Roter Blitz
+        // (Optional: Hier könnte Rotation-Damping rein oder Drift-Logik)
+    }
+
+    takeDamage(amount) {
+        if (!this.scene || !this.active) return;
+
+        this.hp -= amount;
+
+        // Visual Feedback: Flash Red
         this.setTint(0xff5555);
         this.scene.time.delayedCall(100, () => {
             if (this.active) this.clearTint();
@@ -87,32 +93,31 @@ export default class Asteroid extends Phaser.Physics.Arcade.Sprite {
         }
     }
 
-    /**
-     * Zerstört den Asteroiden, spielt FX und droppt Loot via Scene.
-     */
     destroyAsteroid() {
-        // 1. FX (Explosion)
+        if (!this.scene) return;
+
+        // 1. FX
         if (this.scene.fxManager) {
-            // Skalierung der Explosion basierend auf Asteroiden-Größe
-            let scale = (this.sizeCategory === 'large') ? 2.0 : (this.sizeCategory === 'small' ? 0.5 : 1.0);
+            let scale = 1.0;
+            if (this.sizeCategory === 'small') scale = 0.5;
+            if (this.sizeCategory === 'large') scale = 2.0;
             this.scene.fxManager.playExplosion(this.x, this.y, scale);
         }
 
-        // 2. LOOT DROP DELEGATION
-        // Wir prüfen sicherheitshalber, ob die Scene die Methode hat
+        // 2. LOOT DROP
+        // Wir rufen die spawnLoot Funktion der Scene auf
         if (typeof this.scene.spawnLoot === 'function') {
-            let amount = (this.sizeCategory === 'large') ? Phaser.Math.Between(5, 10) : Phaser.Math.Between(2, 5);
-            if (this.sizeCategory === 'small') amount = 1;
-
-            // Zufallsauswahl Erz-Typ (könnte später via Parameter gesteuert werden)
+            // Menge basierend auf Größe
+            let amount = 1;
+            if (this.sizeCategory === 'medium') amount = Phaser.Math.Between(2, 5);
+            if (this.sizeCategory === 'large') amount = Phaser.Math.Between(5, 10);
+            
+            // Zufälliger Ware-Drop (Simuliert)
             const type = (Math.random() > 0.5) ? 'ore_iron' : 'ore_ice';
             
             this.scene.spawnLoot(this.x, this.y, type, amount);
-        } else {
-            console.warn('GameScene.spawnLoot is not a function!');
         }
 
-        // 3. Objekt entfernen
         this.destroy();
     }
 }
