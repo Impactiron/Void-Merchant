@@ -1,3 +1,5 @@
+import { CONFIG } from '../core/config.js'; // Optional, falls config benötigt wird
+
 export default class BootScene extends Phaser.Scene {
     constructor() {
         super({ key: 'BootScene' });
@@ -6,11 +8,16 @@ export default class BootScene extends Phaser.Scene {
     preload() {
         console.log("BootScene: System Init...");
 
+        // Fehler-Überwachung beim Laden
+        this.load.on('loaderror', (file) => {
+            console.warn(`BootScene: Asset konnte nicht geladen werden: ${file.key}`);
+        });
+
         // Ladebalken Visualisierung
         this.createLoadingBar();
 
         // --- 1. SPRITES (Ships & Stations) ---
-        // Basis-Pfad für Sprites setzen
+        // Basis-Pfad für Sprites setzen (Relative Pfade beachten!)
         this.load.setPath('assets/sprites/');
 
         // Ships (Terran)
@@ -69,7 +76,7 @@ export default class BootScene extends Phaser.Scene {
 
         // Events
         this.load.on('complete', () => {
-            console.log("BootScene: All Assets Loaded.");
+            console.log("BootScene: All Assets Loaded (or failed gracefully).");
             // Kurze Verzögerung für Smoothness, dann Start
             this.time.delayedCall(500, () => {
                 // Check ob MenuScene registriert ist, um Crash zu vermeiden
@@ -120,6 +127,7 @@ export default class BootScene extends Phaser.Scene {
         this.createFallbacks();
 
         // Animationen global erstellen (damit sie überall verfügbar sind)
+        // Wir prüfen, ob das Spritesheet da ist, sonst Fallback-Animation vermeiden oder Dummy nutzen
         if (this.textures.exists('spr_fx_explosion')) {
             this.anims.create({
                 key: 'anim_explosion',
@@ -134,8 +142,7 @@ export default class BootScene extends Phaser.Scene {
         // Generiert nur Texturen, die vom Loader NICHT gefunden wurden (Sicherheitsnetz)
         const checkAndGen = (key, color, w, h) => {
             if (!this.textures.exists(key)) {
-                // Nur warnen, wenn es kein FX Sprite ist (die laden wir oft später)
-                // console.warn(`Asset missing: ${key}. Generating fallback.`);
+                console.warn(`BootScene: Generating fallback texture for: ${key}`);
                 const g = this.make.graphics().fillStyle(color).fillRect(0,0,w,h);
                 g.generateTexture(key, w, h);
             }
@@ -143,10 +150,14 @@ export default class BootScene extends Phaser.Scene {
 
         // Fallbacks für Schiffe
         checkAndGen('spr_ship_terran_fighter', 0x00d4ff, 32, 32);
+        checkAndGen('spr_ship_terran_scout', 0x00d4ff, 24, 24); // Neu
+        checkAndGen('spr_ship_terran_freighter', 0x00d4ff, 48, 48); // Neu
         checkAndGen('spr_ship_xenon_n', 0xff0000, 32, 32);
-        checkAndGen('spr_npc_trader', 0xffcc00, 32, 32); // Gelb für Trader Fallback
+        checkAndGen('spr_ship_xenon_m', 0xff0000, 48, 48); // Neu
+        checkAndGen('spr_ship_xenon_k', 0x880000, 128, 128); // Neu (Capital)
+        checkAndGen('spr_npc_trader', 0xffcc00, 32, 32);
 
-        // Fallbacks für UI Icons (Standard 16-32px)
+        // Fallbacks für UI Icons
         checkAndGen('ui_icon_credits', 0xffff00, 16, 16);
         checkAndGen('ui_icon_cargo', 0x888888, 16, 16);
         checkAndGen('ui_icon_energy', 0x00ff00, 16, 16);
@@ -154,21 +165,26 @@ export default class BootScene extends Phaser.Scene {
         checkAndGen('ui_icon_map_enemy', 0xff0000, 16, 16);
         checkAndGen('ui_icon_map_station', 0x0000ff, 16, 16);
 
-        // Fallbacks für HUD (WICHTIG: Sane Defaults, falls Assets fehlen)
+        // Fallbacks für HUD
         checkAndGen('ui_hud_reticle', 0xffffff, 32, 32);
-        checkAndGen('ui_bar_frame', 0x444444, 300, 30); // Grau
-        checkAndGen('ui_bar_fill_health', 0xff3333, 140, 20); // Rot
-        checkAndGen('ui_bar_fill_shield', 0x33aaff, 140, 20); // Blau
-        checkAndGen('ui_radar_circle', 0x002244, 140, 140); // Dunkelblau
+        checkAndGen('ui_bar_frame', 0x444444, 300, 30);
+        checkAndGen('ui_bar_fill_health', 0xff3333, 140, 20);
+        checkAndGen('ui_bar_fill_shield', 0x33aaff, 140, 20);
+        checkAndGen('ui_radar_circle', 0x002244, 140, 140);
 
         // Fallbacks für Environment
         checkAndGen('spr_asteroid_iron', 0x555555, 32, 32);
+        checkAndGen('spr_asteroid_ice', 0xaaddff, 32, 32); // Neu
         checkAndGen('spr_gate_jump', 0xff00ff, 64, 64);
         checkAndGen('spr_loot_container', 0xffd700, 24, 24);
+        
+        // Fallbacks für Stations
+        checkAndGen('spr_station_hub_terran', 0xaaaaaa, 128, 128);
+        checkAndGen('spr_station_solar_array', 0xdddd00, 64, 64);
+        checkAndGen('spr_station_dock_arm', 0x444444, 32, 96);
 
         // Fallbacks für Projectiles
         checkAndGen('spr_proj_laser_red', 0xff0000, 16, 4);
+        checkAndGen('spr_proj_plasma_green', 0x00ff00, 16, 8);
     }
 }
-
-
