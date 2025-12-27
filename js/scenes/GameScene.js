@@ -1,8 +1,11 @@
+// FILE: js/scenes/GameScene.js
+
 /**
  * 📘 PROJECT: VOID MERCHANT
  * SCENE: GAME SCENE (Active Sector)
  * * UPDATE Phase 2.1: Integrated SectorThreatManager & Mining Events
- * * FIX: Nutzung der getGroup Schnittstelle für Projektile
+ * * FIX: Updated ProjectileManager Access (No more getGroup)
+ * * FIX: NPC Auto-Scaling
  */
 
 import InputManager from '../core/InputManager.js';
@@ -14,10 +17,10 @@ import SaveSystem from '../core/SaveSystem.js';
 import AudioManager from '../core/AudioManager.js';
 import MissionManager from '../core/MissionManager.js';
 import SectorManager from '../core/SectorManager.js';
-import SectorThreatManager from '../core/SectorThreatManager.js'; // NEU
+import SectorThreatManager from '../core/SectorThreatManager.js'; 
 import { CONFIG } from '../core/config.js';
 import StationMenu from '../ui/StationMenu.js';
-import events from '../core/EventsCenter.js';
+import { enforceSpriteSize } from '../core/SpriteHelper.js'; // NEU für Konsistenz
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
@@ -60,7 +63,7 @@ export default class GameScene extends Phaser.Scene {
         this.inputManager = new InputManager(this);
         this.stationMenu = new StationMenu(this);
         
-        // NEU: Hive Mind Integration
+        // Threat Manager (Hive Mind)
         this.threatManager = new SectorThreatManager(this);
 
         if (!window.game.missionManager) {
@@ -152,6 +155,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     setupCollisions() {
+        // Static Collisions
         this.physics.add.collider(this.player, this.asteroids);
         this.physics.add.collider(this.player, this.stations);
         this.physics.add.collider(this.asteroids, this.asteroids);
@@ -159,16 +163,23 @@ export default class GameScene extends Phaser.Scene {
         this.physics.add.collider(this.enemies, this.enemies);
         this.physics.add.collider(this.player, this.enemies);
 
-        // Nutzung der neuen Helper-Methode für sauberen Zugriff
-        this.physics.add.overlap(this.projectileManager.getGroup('player'), this.enemies, this.handleLaserHitEnemy, null, this);
-        this.physics.add.overlap(this.projectileManager.getGroup('player'), this.asteroids, this.handleLaserHitAsteroid, null, this);
-        
-        this.physics.add.overlap(this.projectileManager.getGroup('enemy'), this.player, this.handleLaserHitPlayer, null, this);
-        this.physics.add.overlap(this.projectileManager.getGroup('enemy'), this.asteroids, this.handleLaserHitAsteroid, null, this);
-        
-        this.physics.add.overlap(this.projectileManager.getGroup('enemy'), this.stations, (st, l) => this.projectileManager.killBullet(l));
-        this.physics.add.overlap(this.projectileManager.getGroup('player'), this.stations, (st, l) => this.projectileManager.killBullet(l));
-        
+        // Projectile Collisions (Direct Property Access Fix)
+        if (this.projectileManager) {
+            // Player Lasers
+            if (this.projectileManager.playerLasers) {
+                this.physics.add.overlap(this.projectileManager.playerLasers, this.enemies, this.handleLaserHitEnemy, null, this);
+                this.physics.add.overlap(this.projectileManager.playerLasers, this.asteroids, this.handleLaserHitAsteroid, null, this);
+                this.physics.add.overlap(this.projectileManager.playerLasers, this.stations, (st, l) => this.projectileManager.killBullet(l));
+            }
+            // Enemy Lasers
+            if (this.projectileManager.enemyLasers) {
+                this.physics.add.overlap(this.projectileManager.enemyLasers, this.player, this.handleLaserHitPlayer, null, this);
+                this.physics.add.overlap(this.projectileManager.enemyLasers, this.asteroids, this.handleLaserHitAsteroid, null, this);
+                this.physics.add.overlap(this.projectileManager.enemyLasers, this.stations, (st, l) => this.projectileManager.killBullet(l));
+            }
+        }
+
+        // Loot
         this.physics.add.overlap(this.player, this.lootGroup, this.handleLootCollection, null, this);
     }
 
@@ -181,7 +192,7 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
 
-        // NEU: Update Threat Logic (Decay & Spawn checks)
+        // Threat Logic
         if (this.threatManager) this.threatManager.update(time, delta);
 
         if (this.isDocked || this.isJumping) return;
@@ -230,7 +241,10 @@ export default class GameScene extends Phaser.Scene {
             if (sprite.targetX !== undefined && sprite.targetY !== undefined) {
                 sprite.x = Phaser.Math.Linear(sprite.x, sprite.targetX, 0.05);
                 sprite.y = Phaser.Math.Linear(sprite.y, sprite.targetY, 0.05);
-                // Rotate visual
+                // Rotate visual if needed
+                if (sprite.targetX !== sprite.x) {
+                    sprite.rotation = Phaser.Math.Angle.Between(sprite.x, sprite.y, sprite.targetX, sprite.targetY);
+                }
             }
         });
     }
@@ -291,7 +305,10 @@ export default class GameScene extends Phaser.Scene {
         }
 
         const sprite = this.add.sprite(agent.x, agent.y, texture);
-        sprite.setDisplaySize(64, 64);
+        
+        // FIX: Nutze globalen Scaler statt Hardcoded Werte
+        enforceSpriteSize(sprite, 64); // Traders/NPCs als M-Class Standard
+        
         sprite.targetX = agent.x;
         sprite.targetY = agent.y;
         this.npcMap.set(agent.id, sprite);
@@ -413,7 +430,7 @@ export default class GameScene extends Phaser.Scene {
         const speed = Phaser.Math.Between(50, 150);
         this.physics.velocityFromAngle(angle, speed, loot.body.velocity);
 
-        // NEU: Global Event for Threat Manager
+        // Global Event for Threat Manager
         if (this.events) {
             this.events.emit('mining-complete', { sector: this.currentSectorId, amount: amount });
         }
