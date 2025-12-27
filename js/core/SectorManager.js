@@ -76,7 +76,9 @@ export default class SectorManager {
 
         // Background
         const bgKey = this.scene.textures.exists(this.sectorData.background) ? this.sectorData.background : 'bg_stars_01';
-        if (this.scene.bg) {
+        
+        // FIX: Prüfen, ob bg existiert UND noch aktiv ist (eine Szene besitzt)
+        if (this.scene.bg && this.scene.bg.scene) {
             this.scene.bg.setTexture(bgKey);
         } else {
             this.scene.bg = this.scene.add.tileSprite(0, 0, CONFIG.width, CONFIG.height, bgKey)
@@ -169,10 +171,6 @@ export default class SectorManager {
         if (!this.sectorData.enemies || this.sectorData.enemies.density <= 0) return;
         if (!this.scene.player) return;
 
-        // Sicherheitscheck: Haben wir Typen definiert?
-        const enemyTypes = this.sectorData.enemies.types;
-        if (!enemyTypes || enemyTypes.length === 0) return;
-
         for(let i=0; i<count; i++) {
             let x, y;
             let safe = false;
@@ -187,9 +185,8 @@ export default class SectorManager {
                 attempts++;
             }
             
-            // FIX: Wähle zufälligen Typ aus der DB-Liste
-            const type = Phaser.Math.RND.pick(enemyTypes);
-            
+            // Einfacher Gegner-Typ Selector (könnte man noch aus der DB holen)
+            const type = 'spr_ship_xenon_n'; 
             const enemy = new EnemyShip(this.scene, x, y, type, this.scene.player, this.scene.projectileManager);
             this.scene.enemies.add(enemy);
         }
