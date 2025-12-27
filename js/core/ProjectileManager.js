@@ -4,7 +4,7 @@
  * 📘 PROJECT: VOID MERCHANT
  * MODULE: PROJECTILE MANAGER
  * * Implementiert Object Pooling für Projektile.
- * * UPDATE: Getrennte Gruppen für Player und Enemy Projectiles (Friendly Fire Logic).
+ * * UPDATE: Accessor-Pattern (getGroup) für sichereren Zugriff in Szenen.
  */
 
 export default class ProjectileManager {
@@ -22,6 +22,18 @@ export default class ProjectileManager {
             defaultKey: 'spr_proj_laser_red',
             maxSize: 50
         });
+    }
+
+    /**
+     * Gibt die Phaser-Physik-Gruppe basierend auf der Quelle zurück.
+     * @param {string} type - 'player' oder 'enemy'
+     * @returns {Phaser.Physics.Arcade.Group}
+     */
+    getGroup(type) {
+        if (type === 'player') return this.playerLasers;
+        if (type === 'enemy') return this.enemyLasers;
+        console.warn('ProjectileManager: Unknown group type requested:', type);
+        return this.playerLasers; // Fallback
     }
 
     /**
@@ -83,5 +95,3 @@ export default class ProjectileManager {
         bullet.body.stop();
     }
 }
-
-
