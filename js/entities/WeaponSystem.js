@@ -1,20 +1,13 @@
-// FILE: js/entities/WeaponSystem.js
-
-/**
- * 📘 PROJECT: VOID MERCHANT
- * MODULE: WEAPON SYSTEM
- * * Verwaltet Waffen-Slots, Cooldowns und feuert via ProjectileManager.
- * * UPDATE: Added Beam Weapon Logic & Player Auto-Targeting for Beams.
- */
-
 import { WEAPON_DB } from '../data/WeaponDB.js';
+import { ProjectileManager } from '../core/ProjectileManager.js'; // Assuming named export if standardized, or default if not changed yet. Keeping safe.
+import { EventsCenter } from '../core/EventsCenter.js';
 
-export default class WeaponSystem {
+export class WeaponSystem {
     /**
-     * @param {Phaser.Scene} scene 
-     * @param {Ship} ship 
-     * @param {ProjectileManager} projectileManager 
-     * @param {BeamComponent} beamComponent - Optional/Neu
+     * @param {Phaser.Scene} scene
+     * @param {Phaser.Physics.Arcade.Sprite} ship
+     * @param {ProjectileManager} projectileManager
+     * @param {Object} beamComponent - Optional (für Kha'ak)
      */
     constructor(scene, ship, projectileManager, beamComponent = null) {
         this.scene = scene;
@@ -22,153 +15,116 @@ export default class WeaponSystem {
         this.projectileManager = projectileManager;
         this.beamComponent = beamComponent;
 
-        // Default Loadout
-        this.activeWeaponId = 'wpn_laser_pulse_s';
-        this.weaponStats = WEAPON_DB[this.activeWeaponId];
-
+        // Standard-Werte
+        this.mounts = [];
+        this.activeWeaponId = 'wpn_impulse_mk1';
+        this.weaponData = null;
         this.lastFired = 0;
-        this.cooldown = 1000 / this.weaponStats.fireRate;
+        this.heat = 0;
+        this.maxHeat = 100;
+        this.coolingRate = 20; // Heat pro Sekunde
+        this.isOverheated = false;
 
-        // Cache für Input-Position (für Player Beam Targeting)
-        this.lastAimPosition = null;
+        this.init();
     }
 
-    equip(weaponId) {
-        if (!WEAPON_DB[weaponId]) {
-            console.error(`WeaponSystem: Unknown weapon ID ${weaponId}`);
-            return;
-        }
-
-        this.activeWeaponId = weaponId;
-        this.weaponStats = WEAPON_DB[weaponId];
-        this.cooldown = 1000 / this.weaponStats.fireRate;
-
-        console.log(`WeaponSystem: Equipped ${this.weaponStats.name}`);
-    }
-
-    update(input, time) {
-        // Input merken für Targeting (falls InputManager eine Methode hat)
-        if (input && typeof input.getAimPosition === 'function') {
-            this.lastAimPosition = input.getAimPosition();
-        }
-
-        if (input.getFire()) {
-            this.tryFire(time);
-        }
-    }
-
-    tryFire(time) {
-        if (time > this.lastFired + this.cooldown) {
-            this.fire(time);
-        }
-    }
-
-    fire(time) {
-        this.lastFired = time;
-
-        // --- BRANCH: BEAM WEAPON ---
-        if (this.weaponStats.type === 'BEAM') {
-            if (!this.beamComponent) {
-                console.warn("WeaponSystem: Beam weapon equipped but no BeamComponent attached.");
-                return;
-            }
-
-            let target = null;
-
-            // TARGETING LOGIC
-            if (this.ship.faction === 'PLAYER') {
-                // Player Targeting: Finde Gegner nahe der Mausposition (Aim Assist)
-                target = this.getPlayerTarget();
-            } else {
-                // AI Targeting: Nutze das gespeicherte Ziel der KI
-                target = this.ship.target;
-            }
-
-            // FEUER (Nur wenn valides Ziel existiert)
-            if (target && target.active) {
-                // Sound Effect (Optional, falls Beam eigenen Sound hat)
-                // this.playFireSound(); // Aktuell macht das BeamComponent oder wir fügen es hier ein
-
-                // Strahl feuern (Visual + Damage)
-                this.beamComponent.fire(this.ship, target, this.weaponStats.damage);
-            }
-            
-            return; // Beende hier, kein Projektil feuern
-        }
-
-        // --- BRANCH: PROJECTILE WEAPON (Standard) ---
+    init() {
+        this.loadWeapon(this.activeWeaponId);
         
-        const wingOffset = 20;
-
-        const vecLeft = new Phaser.Math.Vector2(0, -wingOffset).rotate(this.ship.rotation);
-        const vecRight = new Phaser.Math.Vector2(0, wingOffset).rotate(this.ship.rotation);
-        const forward = new Phaser.Math.Vector2(30, 0).rotate(this.ship.rotation);
-
-        const spawnLeft = {
-            x: this.ship.x + vecLeft.x + forward.x,
-            y: this.ship.y + vecLeft.y + forward.y
-        };
-        const spawnRight = {
-            x: this.ship.x + vecRight.x + forward.x,
-            y: this.ship.y + vecRight.y + forward.y
-        };
-
-        const isPlayer = (this.ship.faction === 'PLAYER');
-
-        this.playFireSound(isPlayer);
-
-        // Fire Left
-        this.projectileManager.fireBullet(
-            spawnLeft.x, spawnLeft.y, this.ship.rotation,
-            this.weaponStats.speed, this.weaponStats.damage, this.weaponStats.color,
-            isPlayer
-        );
-
-        // Fire Right
-        this.projectileManager.fireBullet(
-            spawnRight.x, spawnRight.y, this.ship.rotation,
-            this.weaponStats.speed, this.weaponStats.damage, this.weaponStats.color,
-            isPlayer
-        );
+        // Setup Heat Tick
+        this.timer = this.scene.time.addEvent({
+            delay: 100,
+            callback: this.updateCooling,
+            callbackScope: this,
+            loop: true
+        });
     }
 
     /**
-     * Hilfsmethode: Findet das beste Ziel für den Spieler (Beam Weapons)
-     * Sucht nach Gegnern unter dem Mauszeiger oder in der Nähe.
+     * Lädt eine Waffe aus der DB in das System
+     * @param {string} weaponId 
      */
-    getPlayerTarget() {
-        if (!this.lastAimPosition || !this.scene.enemies) return null;
-
-        let closestEnemy = null;
-        let closestDist = 100; // Pixel Toleranz (Aim Assist Radius)
-
-        // Iteriere über alle aktiven Gegner
-        this.scene.enemies.children.iterate(enemy => {
-            if (enemy.active) {
-                const dist = Phaser.Math.Distance.Between(
-                    this.lastAimPosition.x, this.lastAimPosition.y,
-                    enemy.x, enemy.y
-                );
-
-                if (dist < closestDist) {
-                    closestDist = dist;
-                    closestEnemy = enemy;
-                }
-            }
-        });
-
-        return closestEnemy;
+    loadWeapon(weaponId) {
+        if (!WEAPON_DB[weaponId]) {
+            console.warn(`[WeaponSystem] Waffe ID ${weaponId} nicht gefunden. Fallback auf MK1.`);
+            weaponId = 'wpn_impulse_mk1';
+        }
+        
+        this.activeWeaponId = weaponId;
+        this.weaponData = WEAPON_DB[weaponId];
+        // console.log(`[WeaponSystem] Loaded: ${this.weaponData.name}`);
     }
 
-    playFireSound(isPlayer) {
-        if (this.scene.audioManager) {
-            const vol = isPlayer ? 0.3 : 0.1;
-            const cam = this.scene.cameras.main;
-            if (cam.worldView.contains(this.ship.x, this.ship.y)) {
-                this.scene.audioManager.playSfx('sfx_laser_shoot', { volume: vol });
+    updateCooling() {
+        if (this.heat > 0) {
+            // Cooling Rate ist pro Sekunde, wir rufen alle 100ms auf -> /10
+            this.heat -= (this.coolingRate / 10);
+            if (this.heat < 0) this.heat = 0;
+
+            // Overheat Reset bei < 50%
+            if (this.isOverheated && this.heat < 50) {
+                this.isOverheated = false;
+                EventsCenter.emit('weapon-ready', this.ship);
             }
+
+            // UI Update Event senden (nur wenn nötig, um Performance zu sparen)
+            EventsCenter.emit('ui-update-heat', this.heat);
         }
     }
+
+    /**
+     * Hauptfeuer-Logik
+     * @param {number} time - Aktuelle Phaser Zeit
+     */
+    fire(time) {
+        if (!this.weaponData) return;
+        if (this.isOverheated) {
+            // Optional: Sound für "Failed" abspielen
+            return;
+        }
+
+        if (time > this.lastFired + this.weaponData.fireRate) {
+            
+            // Hitze Check
+            if (this.heat + this.weaponData.heatGen > this.maxHeat) {
+                this.isOverheated = true;
+                EventsCenter.emit('weapon-overheat', this.ship);
+                return;
+            }
+
+            // Mündungsfeuer Position berechnen (Rotationsabhängig)
+            // Einfache Annahme: Vorne am Schiff. 
+            // TODO: Hardpoints definieren
+            const vec = new Phaser.Math.Vector2();
+            vec.setToPolar(this.ship.rotation, this.ship.width * 0.5);
+            
+            const spawnX = this.ship.x + vec.x;
+            const spawnY = this.ship.y + vec.y;
+
+            // Projektil feuern
+            if (this.weaponData.type === 'projectile') {
+                this.projectileManager.fireBullet(
+                    spawnX, 
+                    spawnY, 
+                    this.ship.rotation, 
+                    this.ship, // Owner
+                    this.weaponData
+                );
+            } else if (this.weaponData.type === 'beam' && this.beamComponent) {
+                // Beam Logik
+                this.beamComponent.fire(this.ship, this.weaponData);
+            }
+
+            // Hitze erhöhen
+            this.heat += this.weaponData.heatGen;
+            this.lastFired = time;
+
+            // Audio triggern
+            // EventsCenter.emit('play-sound', this.weaponData.sound);
+        }
+    }
+
+    destroy() {
+        if (this.timer) this.timer.remove();
+    }
 }
-
-
