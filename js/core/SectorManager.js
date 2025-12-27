@@ -1,192 +1,82 @@
-// FILE: js/core/SectorManager.js
+import { Gate } from '../entities/Gate.js';
+import { Station } from '../entities/Station.js';
+import { Asteroid } from '../entities/Asteroid.js';
+import { EnemyShip } from '../entities/EnemyShip.js';
+import { SectorDB } from '../data/SectorDB.js';
 
-/**
- * 📘 PROJECT: VOID MERCHANT
- * MODULE: SECTOR MANAGER
- * * Kapselt die Logik zum Laden und Verwalten von Sektoren.
- * * Entlastet die GameScene.
- */
-
-import { SECTOR_DB } from '../data/SectorDB.js';
-import Asteroid from '../entities/Asteroid.js';
-import EnemyShip from '../entities/EnemyShip.js';
-import Station from '../entities/Station.js';
-import Gate from '../entities/Gate.js';
-import { CONFIG } from './config.js';
-
-export default class SectorManager {
+export class SectorManager {
     constructor(scene) {
         this.scene = scene;
+        this.currentSector = null;
+        this.entities = {
+            asteroids: [],
+            stations: [],
+            gates: [],
+            enemies: []
+        };
+    }
+
+    init(sectorId) {
+        this.currentSector = SectorDB[sectorId];
+        if (!this.currentSector) {
+            console.error(`SectorManager: Sector ${sectorId} not found! Defaulting to 0-0.`);
+            this.currentSector = SectorDB["0-0"];
+        }
         
-        // Spawn Timers
-        this.lastEnemySpawn = 0;
-        this.enemySpawnDelay = 10000;
-        this.lastAsteroidSpawn = 0;
-        this.asteroidSpawnDelay = 5000;
-    }
+        // Clear old entities
+        this.entities.asteroids = [];
+        this.entities.stations = [];
+        this.entities.gates = [];
+        this.entities.enemies = [];
 
-    /**
-     * Lädt einen Sektor komplett neu.
-     * @param {string} sectorId 
-     * @param {string} entryGateId 
-     */
-    loadSector(sectorId) {
-        console.log(`SectorManager: Loading ${sectorId}...`);
-
-        // 1. Daten holen
-        this.sectorData = SECTOR_DB[sectorId];
-        if (!this.sectorData) {
-            console.warn(`SectorManager: Sector ${sectorId} not found! Fallback to Argon Prime.`);
-            this.sectorData = SECTOR_DB['sec_argon_prime'];
-        }
-
-        // 2. Gruppen bereinigen (falls vorhanden)
-        this.clearGroups();
-
-        // 3. Environment setzen
-        this.setupEnvironment();
-
-        // 4. Statische Entities spawnen
-        this.spawnStaticEntities();
-
-        // 5. Initiale dynamische Population
-        this.spawnAsteroids(20 * (this.sectorData.asteroids?.density || 1));
+        console.log(`SectorManager: Initialized Sector ${this.currentSector.name} (${sectorId})`);
         
-        const enemyDensity = this.sectorData.enemies?.density || 0.5;
-        this.spawnEnemies(Math.floor(3 * enemyDensity));
-
-        // 6. UI Update (via Scene Access, idealerweise via Events, aber hier direkt)
-        const uiScene = this.scene.scene.get('UIScene');
-        if (uiScene && uiScene.txtSector) {
-            uiScene.txtSector.setText(`SEC: ${this.sectorData.name.toUpperCase()}`);
-        }
+        // Setup World Bounds
+        this.scene.physics.world.setBounds(0, 0, this.currentSector.width, this.currentSector.height);
+        
+        // Background color based on security level (visual debug)
+        const hexColor = this.currentSector.securityLevel > 0 ? 0x000022 : 0x110000;
+        this.scene.cameras.main.setBackgroundColor(hexColor);
     }
 
-    clearGroups() {
-        if (this.scene.asteroids) this.scene.asteroids.clear(true, true);
-        if (this.scene.enemies) this.scene.enemies.clear(true, true);
-        if (this.scene.gates) this.scene.gates.clear(true, true);
-        if (this.scene.stations) this.scene.stations.clear(true, true);
-        if (this.scene.lootGroup) this.scene.lootGroup.clear(true, true);
-    }
+    spawnSectorEntities() {
+        if (!this.currentSector) return;
 
-    setupEnvironment() {
-        // World Bounds
-        this.scene.physics.world.setBounds(-4000, -4000, 8000, 8000);
-
-        // Background
-        const bgKey = this.scene.textures.exists(this.sectorData.background) ? this.sectorData.background : 'bg_stars_01';
-        if (this.scene.bg) {
-            this.scene.bg.setTexture(bgKey);
-        } else {
-            this.scene.bg = this.scene.add.tileSprite(0, 0, CONFIG.width, CONFIG.height, bgKey)
-                .setOrigin(0)
-                .setScrollFactor(0);
-        }
-
-        // Music
-        const musicKey = this.sectorData.music || 'mus_ambience_deep_space';
-        if (this.scene.audioManager) {
-            this.scene.audioManager.playMusic(musicKey, 2000);
-        }
-    }
-
-    spawnStaticEntities() {
-        // Stations
-        if (this.sectorData.stations) {
-            this.sectorData.stations.forEach(stData => {
-                const station = new Station(this.scene, stData.x, stData.y, stData.type, stData.name);
-                this.scene.stations.add(station);
+        // 1. Spawn Asteroids
+        if (this.currentSector.asteroids) {
+            this.currentSector.asteroids.forEach(data => {
+                const asteroid = new Asteroid(this.scene, data.x, data.y, data.type);
+                this.entities.asteroids.push(asteroid);
             });
         }
 
-        // Gates
-        if (this.sectorData.gates) {
-            this.sectorData.gates.forEach(gData => {
-                const gate = new Gate(this.scene, gData.x, gData.y, gData.id, gData.targetSector, gData.targetGateId);
-                this.scene.gates.add(gate);
+        // 2. Spawn Stations
+        if (this.currentSector.stations) {
+            this.currentSector.stations.forEach(data => {
+                const station = new Station(this.scene, data.x, data.y, data.type, data.id);
+                this.entities.stations.push(station);
             });
         }
-    }
 
-    handlePopulation(time) {
-        const density = this.sectorData.asteroids?.density || 1.0;
-        const enemyDensity = this.sectorData.enemies?.density || 0.5;
-
-        // Asteroids Respawn
-        if (time > this.lastAsteroidSpawn + this.asteroidSpawnDelay) {
-            const currentAsteroids = this.scene.asteroids.countActive();
-            if (currentAsteroids < 15 * density) {
-                this.spawnAsteroids(3);
-            }
-            this.lastAsteroidSpawn = time;
+        // 3. Spawn Gates
+        if (this.currentSector.gates) {
+            this.currentSector.gates.forEach(data => {
+                const gate = new Gate(this.scene, data.x, data.y, data.targetSector, data.id, data.targetGateId);
+                this.entities.gates.push(gate);
+            });
         }
 
-        // Enemy Respawn
-        if (time > this.lastEnemySpawn + this.enemySpawnDelay) {
-            const currentEnemies = this.scene.enemies.countActive();
-            if (currentEnemies < 2 * enemyDensity) {
-                if (enemyDensity > 0) {
-                    this.spawnEnemies(1);
-                    // Optional: Warning Event emit
-                }
+        // 4. Spawn Enemies (Simple initial spawn logic)
+        // In Zukunft: SectorThreatManager übernimmt das
+        if (this.currentSector.securityLevel < 0.5) {
+            // Gefährlicher Sektor - Spawn Piraten
+            const count = Math.floor(Math.random() * 3) + 1;
+            for (let i = 0; i < count; i++) {
+                const x = Math.random() * this.currentSector.width;
+                const y = Math.random() * this.currentSector.height;
+                const enemy = new EnemyShip(this.scene, x, y, 'pir_s_fighter_standard');
+                this.entities.enemies.push(enemy);
             }
-            this.lastEnemySpawn = time;
-        }
-    }
-
-    spawnAsteroids(count) {
-        for (let i = 0; i < count; i++) {
-            let x, y;
-            let safe = false;
-            let attempts = 0;
-            
-            while(!safe && attempts < 10) {
-                x = Phaser.Math.Between(-3500, 3500);
-                y = Phaser.Math.Between(-3500, 3500);
-                
-                let tooClose = false;
-                if (this.scene.player) {
-                    if (Phaser.Math.Distance.Between(x, y, this.scene.player.x, this.scene.player.y) < 500) tooClose = true;
-                }
-                
-                this.scene.stations.children.iterate(st => {
-                    if (Phaser.Math.Distance.Between(x, y, st.x, st.y) < 800) tooClose = true;
-                });
-                
-                if (!tooClose) safe = true;
-                attempts++;
-            }
-            
-            const sizes = ['small', 'medium', 'large'];
-            const size = sizes[Phaser.Math.Between(0, 2)];
-            const asteroid = new Asteroid(this.scene, x, y, size);
-            this.scene.asteroids.add(asteroid);
-        }
-    }
-
-    spawnEnemies(count) {
-        if (!this.sectorData.enemies || this.sectorData.enemies.density <= 0) return;
-        if (!this.scene.player) return;
-
-        for(let i=0; i<count; i++) {
-            let x, y;
-            let safe = false;
-            let attempts = 0;
-            
-            while(!safe && attempts < 10) {
-                x = Phaser.Math.Between(-3500, 3500);
-                y = Phaser.Math.Between(-3500, 3500);
-                
-                const distPlayer = Phaser.Math.Distance.Between(x, y, this.scene.player.x, this.scene.player.y);
-                if (distPlayer > 1500 && distPlayer < 3000) safe = true;
-                attempts++;
-            }
-            
-            // Einfacher Gegner-Typ Selector (könnte man noch aus der DB holen)
-            const type = 'spr_ship_xenon_n'; 
-            const enemy = new EnemyShip(this.scene, x, y, type, this.scene.player, this.scene.projectileManager);
-            this.scene.enemies.add(enemy);
         }
     }
 
@@ -201,12 +91,23 @@ export default class SectorManager {
         this.scene.cameras.main.fade(1000, 0, 0, 0);
         player.body.stop();
 
-        // Data Persistence
+        // --- FIX: Extract Data from Components cleanly ---
+        // Wir greifen auf die Components (health, cargo) zu, nicht auf das Ship-Objekt direkt.
+        // Dies verhindert Circular Reference Errors und stellt sicher, dass wir nur reine Daten übergeben.
+        
         const playerData = {
-            shipId: player.id,
-            stats: player.stats,
-            cargo: player.cargo,
-            weaponId: player.weaponSystem.activeWeaponId
+            shipId: player.id, // ID des Schiffstyps (z.B. 'arg_s_fighter_elite')
+            stats: {
+                hullCurrent: player.health ? player.health.currentHp : 100,
+                shieldCurrent: player.health ? player.health.currentShield : 0,
+                hullMax: player.health ? player.health.maxHp : 100,
+                shieldMax: player.health ? player.health.maxShield : 0
+            },
+            cargo: {
+                // Shallow Copy der Items, um Referenzen zu brechen
+                items: player.cargo ? { ...player.cargo.items } : {}
+            },
+            weaponId: player.weaponSystem ? player.weaponSystem.activeWeaponId : null
         };
 
         this.scene.time.delayedCall(1000, () => {
@@ -217,5 +118,9 @@ export default class SectorManager {
             });
         });
     }
-}
 
+    getGateAt(x, y) {
+        // Hilfsfunktion, falls wir Gates per Klick suchen (für Autopilot später)
+        return this.entities.gates.find(g => Phaser.Math.Distance.Between(g.x, g.y, x, y) < 100);
+    }
+}
